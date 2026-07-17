@@ -10,7 +10,7 @@ This module handles all interactions with the Groq API, including:
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, AsyncGenerator
+from typing import TYPE_CHECKING, AsyncGenerator, Generator
 
 from groq import Groq, APIError, RateLimitError, APITimeoutError
 
@@ -85,7 +85,8 @@ class AIClient:
             )
 
             if stream:
-                return self._stream_response(response)  # type: ignore[arg-type]
+                async for chunk in self._stream_response(response):  # type: ignore[arg-type]
+                    yield chunk
             else:
                 return response.choices[0].message.content or ""
 
@@ -123,7 +124,7 @@ class AIClient:
                     pass
         return None
 
-    def _stream_response(
+    async def _stream_response(
         self,
         response,
     ) -> AsyncGenerator[str, None]:
@@ -164,11 +165,10 @@ class AIClient:
         logger.debug(f"Generating response with {len(user_messages)} messages")
 
         try:
-            stream = self._make_api_call(  # type: ignore[assignment]
+            async for chunk in self._make_api_call(
                 messages=messages,
                 stream=True,
-            )
-            for chunk in stream:
+            ):
                 yield chunk
 
         except APIError as e:
