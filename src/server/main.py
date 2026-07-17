@@ -319,15 +319,13 @@ class DiscordAIChatBot:
             loop.add_signal_handler(sig, handle_signal)
 
         # Set up event handlers (will be called after bot is ready)
-        original_is_ready = None
-
-        async def wrapped_is_ready() -> None:
-            """Wrapper for is_ready to initialize decision maker."""
+        async def on_ready() -> None:
+            """Initialize components when bot is ready."""
             await self._setup_decision_maker()
             self._setup_event_handlers()
-            # Call the event handler's is_ready through the handler itself
+            logger.info(f"Bot is ready as {self._bot.user}")
 
-        self._bot.is_ready(wrapped_is_ready)
+        self._bot.event(on_ready)
 
         # Create shutdown task
         async def watch_shutdown() -> None:
