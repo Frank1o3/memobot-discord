@@ -164,11 +164,11 @@ class AIClient:
         logger.debug(f"Generating response with {len(user_messages)} messages")
 
         try:
-            stream = await self._make_api_call(  # type: ignore[assignment]
+            stream = self._make_api_call(  # type: ignore[assignment]
                 messages=messages,
                 stream=True,
             )
-            async for chunk in stream:
+            for chunk in stream:
                 yield chunk
 
         except APIError as e:
