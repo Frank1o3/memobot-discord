@@ -68,15 +68,14 @@ class RateLimitState:
 
         if self.calls_made >= self.max_calls:
             self.is_limited = True
-            remaining = self.window_seconds - (
-                datetime.now(timezone.utc) - self.window_start
-            ).total_seconds()
+            remaining = (
+                self.window_seconds
+                - (datetime.now(timezone.utc) - self.window_start).total_seconds()
+            )
             self.limited_until = datetime.now(timezone.utc) + timedelta(
                 seconds=max(remaining, 0)
             )
-            logger.warning(
-                f"Rate limit reached. Limited until {self.limited_until}"
-            )
+            logger.warning(f"Rate limit reached. Limited until {self.limited_until}")
 
     def get_retry_after(self) -> float:
         """Get seconds until rate limit is lifted."""

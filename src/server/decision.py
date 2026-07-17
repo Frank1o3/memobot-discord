@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 import discord
 
 if TYPE_CHECKING:
-    from .config import Config
+    from server.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -78,11 +78,9 @@ class ChannelConversationState:
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(minutes=10)
         self.active_participants = {
-            uid for uid in self.active_participants
-            if any(
-                e.author_id == uid and e.timestamp > cutoff
-                for e in self.entries
-            )
+            uid
+            for uid in self.active_participants
+            if any(e.author_id == uid and e.timestamp > cutoff for e in self.entries)
         }
 
     def is_bot_involved_recently(self, window_minutes: int = 5) -> bool:
@@ -154,7 +152,9 @@ class ReplyDecisionMaker:
             The channel's conversation state.
         """
         if channel_id not in self._channel_states:
-            self._channel_states[channel_id] = ChannelConversationState(channel_id=channel_id)
+            self._channel_states[channel_id] = ChannelConversationState(
+                channel_id=channel_id
+            )
         return self._channel_states[channel_id]
 
     def record_message(self, message: discord.Message) -> ConversationEntry:
@@ -177,7 +177,9 @@ class ReplyDecisionMaker:
 
         # Check for reply to bot
         replies_to_bot = False
-        if message.reference and isinstance(message.reference, discord.MessageReference):
+        if message.reference and isinstance(
+            message.reference, discord.MessageReference
+        ):
             if message.reference.resolved:
                 resolved = message.reference.resolved
                 replies_to_bot = resolved.author == self._bot_user
@@ -304,8 +306,7 @@ class ReplyDecisionMaker:
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(seconds=60)
         self._cooldowns = {
-            uid: ts for uid, ts in self._cooldowns.items()
-            if ts > cutoff
+            uid: ts for uid, ts in self._cooldowns.items() if ts > cutoff
         }
 
     def get_active_conversation_summary(self, channel_id: int) -> str:

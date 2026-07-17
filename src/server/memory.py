@@ -84,8 +84,7 @@ class UserMemories:
         """
         # Check for duplicates
         existing = next(
-            (m for m in self.memories if m.content.lower() == content.lower()),
-            None
+            (m for m in self.memories if m.content.lower() == content.lower()), None
         )
         if existing:
             logger.debug(f"Memory already exists for user {self.user_id}: {content}")
@@ -259,7 +258,9 @@ class MemoryManager:
             The user's memory collection.
         """
         if user_id not in self._user_memories:
-            self._user_memories[user_id] = UserMemories(user_id=user_id, username=username)
+            self._user_memories[user_id] = UserMemories(
+                user_id=user_id, username=username
+            )
             logger.debug(f"Created new memory collection for user {user_id}")
 
         # Update username if provided
@@ -378,15 +379,12 @@ class MemoryManager:
         Returns:
             Dictionary with memory statistics.
         """
-        total_memories = sum(
-            len(um.memories) for um in self._user_memories.values()
-        )
+        total_memories = sum(len(um.memories) for um in self._user_memories.values())
 
         return {
             "total_users": len(self._user_memories),
             "total_memories": total_memories,
             "average_per_user": (
-                total_memories / len(self._user_memories)
-                if self._user_memories else 0
+                total_memories / len(self._user_memories) if self._user_memories else 0
             ),
         }

@@ -8,7 +8,9 @@ including conversation handling, summarization, and memory extraction.
 from typing import Final
 
 
-SYSTEM_PROMPT: Final[str] = """You are a helpful, friendly AI assistant integrated into a Discord server. 
+SYSTEM_PROMPT: Final[
+    str
+] = """You are a helpful, friendly AI assistant integrated into a Discord server. 
 You communicate in a casual, conversational tone appropriate for Discord chat.
 
 Guidelines:
@@ -24,7 +26,9 @@ Guidelines:
 Remember: You're chatting with real people in real-time. Keep responses natural and engaging."""
 
 
-SUMMARY_PROMPT: Final[str] = """Summarize the following Discord conversation into a concise summary.
+SUMMARY_PROMPT: Final[
+    str
+] = """Summarize the following Discord conversation into a concise summary.
 Focus on:
 - Key topics discussed
 - Important information shared (names, preferences, projects, links)
@@ -39,7 +43,9 @@ Conversation to summarize:
 Summary:"""
 
 
-MEMORY_EXTRACTION_PROMPT: Final[str] = """Extract useful long-term memories from this conversation about the user.
+MEMORY_EXTRACTION_PROMPT: Final[
+    str
+] = """Extract useful long-term memories from this conversation about the user.
 Focus on:
 - User preferences (favorite things, likes/dislikes)
 - Recurring interests or hobbies mentioned
@@ -57,7 +63,9 @@ Conversation:
 Memories (one per line, or empty if nothing worth remembering):"""
 
 
-CONTEXT_BUILDING_INSTRUCTIONS: Final[str] = """Build a chronological conversation context from these messages.
+CONTEXT_BUILDING_INSTRUCTIONS: Final[
+    str
+] = """Build a chronological conversation context from these messages.
 
 Format each message as:
 [username]: message content
@@ -76,7 +84,9 @@ Exclude:
 The goal is to provide the AI with enough context to understand the conversation flow."""
 
 
-REPLY_DECISION_PROMPT: Final[str] = """Decide whether the AI should reply to this message.
+REPLY_DECISION_PROMPT: Final[
+    str
+] = """Decide whether the AI should reply to this message.
 
 Consider replying if:
 - The AI is mentioned (@mentioned)
