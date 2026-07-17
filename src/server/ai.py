@@ -14,15 +14,14 @@ from typing import TYPE_CHECKING, AsyncGenerator
 
 from groq import Groq, APIError, RateLimitError, APITimeoutError
 
-from .prompts import (
-    build_system_prompt,
+from server.prompts import (
     build_summary_prompt,
     build_memory_extraction_prompt,
 )
-from .rate_limit import APIRateLimitHandler, with_retry
+from server.rate_limit import APIRateLimitHandler
 
 if TYPE_CHECKING:
-    from .config import Config
+    from server.config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +79,9 @@ class AIClient:
                 messages=messages,
                 stream=stream,
                 max_tokens=max_tokens or self._config.max_output_tokens,
-                temperature=temperature if temperature is not None else self._config.temperature,
+                temperature=temperature
+                if temperature is not None
+                else self._config.temperature,
             )
 
             if stream:
@@ -238,7 +239,8 @@ class AIClient:
                 lines = [line.strip() for line in result.split("\n") if line.strip()]
                 # Filter out any meta-text
                 memories = [
-                    line for line in lines
+                    line
+                    for line in lines
                     if not line.lower().startswith(("memories:", "here are", "i found"))
                 ]
                 return memories

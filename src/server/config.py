@@ -29,34 +29,27 @@ class Config(BaseModel):
 
     # Groq AI settings
     model: str = Field(
-        "llama-3.3-70b-versatile",
-        description="Groq model to use for inference"
+        "llama-3.3-70b-versatile", description="Groq model to use for inference"
     )
     max_output_tokens: int = Field(
-        1024,
-        ge=1,
-        le=8192,
-        description="Maximum tokens in AI response"
+        1024, ge=1, le=8192, description="Maximum tokens in AI response"
     )
     temperature: float = Field(
         0.7,
         ge=0.0,
         le=2.0,
-        description="Temperature for AI generation (higher = more creative)"
+        description="Temperature for AI generation (higher = more creative)",
     )
 
     # Context handling settings
     max_context_messages: int = Field(
-        50,
-        ge=1,
-        le=200,
-        description="Maximum messages to include in context"
+        50, ge=1, le=200, description="Maximum messages to include in context"
     )
     summary_trigger: int = Field(
         100,
         ge=10,
         le=500,
-        description="Number of messages before triggering summarization"
+        description="Number of messages before triggering summarization",
     )
 
     # Reply decision settings
@@ -64,7 +57,7 @@ class Config(BaseModel):
         0.05,
         ge=0.0,
         le=1.0,
-        description="Probability of random reply when no other trigger matches"
+        description="Probability of random reply when no other trigger matches",
     )
 
     # Behavior settings
@@ -72,21 +65,15 @@ class Config(BaseModel):
         0.03,
         ge=0.001,
         le=0.5,
-        description="Seconds per character for typing simulation"
+        description="Seconds per character for typing simulation",
     )
     cooldown_seconds: int = Field(
-        3,
-        ge=0,
-        le=60,
-        description="Cooldown between responses in seconds"
+        3, ge=0, le=60, description="Cooldown between responses in seconds"
     )
 
     # Memory settings
     memory_limit: int = Field(
-        100,
-        ge=1,
-        le=1000,
-        description="Maximum number of memories to store per user"
+        100, ge=1, le=1000, description="Maximum number of memories to store per user"
     )
 
     @field_validator("prefix")
@@ -107,6 +94,7 @@ class Config(BaseModel):
 
     class Config:
         """Pydantic configuration."""
+
         json_schema_extra = {
             "example": {
                 "token": "your_discord_token",
@@ -120,7 +108,7 @@ class Config(BaseModel):
                 "cooldown_seconds": 3,
                 "memory_limit": 100,
                 "max_output_tokens": 1024,
-                "temperature": 0.7
+                "temperature": 0.7,
             }
         }
 
@@ -179,9 +167,7 @@ class ConfigManager:
             RuntimeError: If configuration hasn't been loaded yet.
         """
         if self._config is None:
-            raise RuntimeError(
-                "Configuration not loaded. Call load() first."
-            )
+            raise RuntimeError("Configuration not loaded. Call load() first.")
         return self._config
 
     def reload(self, config_path: str = "config.json") -> Config:

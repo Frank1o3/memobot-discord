@@ -8,12 +8,8 @@ including fetching channel history, formatting messages, and managing context li
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
-
 import discord
 
-if TYPE_CHECKING:
-    from .config import Config
 
 logger = logging.getLogger(__name__)
 
@@ -252,7 +248,11 @@ def extract_recent_conversation(
     Returns:
         String containing recent conversation.
     """
-    recent = formatted_messages[-lookback:] if len(formatted_messages) > lookback else formatted_messages
+    recent = (
+        formatted_messages[-lookback:]
+        if len(formatted_messages) > lookback
+        else formatted_messages
+    )
 
     if not recent:
         return ""

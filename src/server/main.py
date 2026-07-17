@@ -12,17 +12,15 @@ import asyncio
 import logging
 import signal
 import sys
-from typing import Never
 
 import discord
 from discord.ext import commands
 
-from .ai import AIClient
-from .config import config_manager, get_config, Config
-from .decision import ReplyDecisionMaker
-from .events import setup_event_handlers, EventHandler
-from .memory import MemoryManager
-from .prompts import build_system_prompt
+from server.ai import AIClient
+from server.config import config_manager, Config
+from server.decision import ReplyDecisionMaker
+from server.events import setup_event_handlers, EventHandler
+from server.memory import MemoryManager
 
 # Configure logging
 logging.basicConfig(
@@ -140,7 +138,9 @@ class DiscordAIChatBot:
                 ),
                 inline=False,
             )
-            embed.set_footer(text="Just talk naturally - I'll respond when appropriate!")
+            embed.set_footer(
+                text="Just talk naturally - I'll respond when appropriate!"
+            )
 
             await interaction.response.send_message(embed=embed)
 
@@ -286,7 +286,7 @@ class DiscordAIChatBot:
         )
         logger.info("Event handlers set up")
 
-    async def run(self, config_path: str = "config.json") -> Never:
+    async def run(self, config_path: str = "config.json") -> None:
         """
         Run the bot with graceful shutdown handling.
 
@@ -319,15 +319,15 @@ class DiscordAIChatBot:
             loop.add_signal_handler(sig, handle_signal)
 
         # Set up event handlers (will be called after bot is ready)
-        original_on_ready = None
+        original_is_ready = None
 
-        async def wrapped_on_ready() -> None:
-            """Wrapper for on_ready to initialize decision maker."""
+        async def wrapped_is_ready() -> None:
+            """Wrapper for is_ready to initialize decision maker."""
             await self._setup_decision_maker()
             self._setup_event_handlers()
-            # Call the event handler's on_ready through the handler itself
+            # Call the event handler's is_ready through the handler itself
 
-        self._bot.on_ready(wrapped_on_ready)
+        self._bot.is_ready(wrapped_is_ready)
 
         # Create shutdown task
         async def watch_shutdown() -> None:
@@ -363,7 +363,7 @@ class DiscordAIChatBot:
 bot_instance: DiscordAIChatBot | None = None
 
 
-async def main() -> Never:
+async def run() -> None:
     """
     Main entry point for the bot.
 
@@ -385,5 +385,9 @@ async def main() -> Never:
             await bot_instance._cleanup()
 
 
+def main() -> None:
+    asyncio.run(main=run())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(main=run())

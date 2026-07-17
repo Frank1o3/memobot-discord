@@ -9,23 +9,22 @@ all other modules.
 import asyncio
 import logging
 import random
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
 
-from .ai import AIClient
-from .config import Config, get_config
-from .context import (
+from server.ai import AIClient
+from server.config import Config
+from server.context import (
     fetch_channel_history,
     build_context,
     extract_recent_conversation,
     should_summarize,
 )
-from .decision import ReplyDecisionMaker
-from .memory import MemoryManager
-from .prompts import (
+from server.decision import ReplyDecisionMaker
+from server.memory import MemoryManager
+from server.prompts import (
     build_system_prompt,
     RATE_LIMIT_RESPONSE,
     ERROR_RESPONSES,
@@ -77,7 +76,7 @@ class EventHandler:
 
         logger.info("EventHandler initialized")
 
-    async def on_ready(self) -> None:
+    async def is_ready(self) -> None:
         """
         Handle the bot ready event.
 
@@ -92,15 +91,19 @@ class EventHandler:
 
             # Load memories
             self._memory_manager.load()
-            logger.info(f"Loaded {self._memory_manager.get_stats()['total_memories']} memories")
+            logger.info(
+                f"Loaded {self._memory_manager.get_stats()['total_memories']} memories"
+            )
 
             # Log command info
             slash_commands = len(self._bot.tree.get_commands())
             prefix_commands = len(self._bot.commands)
-            logger.info(f"Loaded {slash_commands} slash commands and {prefix_commands} prefix commands")
+            logger.info(
+                f"Loaded {slash_commands} slash commands and {prefix_commands} prefix commands"
+            )
 
         except Exception as e:
-            logger.error(f"Error during on_ready: {e}")
+            logger.error(f"Error during is_ready: {e}")
             raise
 
     async def on_message(self, message: discord.Message) -> None:
@@ -188,10 +191,12 @@ class EventHandler:
                 # Format conversation for AI
                 user_messages = []
                 if context_str:
-                    user_messages.append({
-                        "role": "user",
-                        "content": f"Conversation context:\n{context_str}",
-                    })
+                    user_messages.append(
+                        {
+                            "role": "user",
+                            "content": f"Conversation context:\n{context_str}",
+                        }
+                    )
 
                 # Add the current message
                 current_msg_content = message.content or "[No text content]"
@@ -199,15 +204,16 @@ class EventHandler:
                 # Include attachment info
                 if message.attachments:
                     attachment_info = ", ".join(
-                        f"[File: {a.filename}]({a.url})"
-                        for a in message.attachments
+                        f"[File: {a.filename}]({a.url})" for a in message.attachments
                     )
                     current_msg_content += f"\n\nAttachments: {attachment_info}"
 
-                user_messages.append({
-                    "role": "user",
-                    "content": f"{message.author.display_name}: {current_msg_content}",
-                })
+                user_messages.append(
+                    {
+                        "role": "user",
+                        "content": f"{message.author.display_name}: {current_msg_content}",
+                    }
+                )
 
                 # Generate response
                 response_text = ""
@@ -253,7 +259,9 @@ class EventHandler:
                         )
 
                 # Check if summarization is needed
-                if should_summarize(len(formatted_messages), self._config.summary_trigger):
+                if should_summarize(
+                    len(formatted_messages), self._config.summary_trigger
+                ):
                     logger.info("Context size exceeded threshold, would summarize")
                     # Summarization logic could be added here
 
@@ -320,7 +328,10 @@ class EventHandler:
 
         # Try to send a welcome message to a general channel
         for channel in guild.text_channels:
-            if "general" in channel.name.lower() or channel.permissions_for(guild.me).send_messages:
+            if (
+                "general" in channel.name.lower()
+                or channel.permissions_for(guild.me).send_messages
+            ):
                 try:
                     await channel.send(
                         "👋 Hey there! I'm your friendly AI assistant. "
@@ -401,7 +412,7 @@ def setup_event_handlers(
     handler = EventHandler(bot, config, ai_client, decision_maker, memory_manager)
 
     # Register event handlers
-    bot.event(handler.on_ready)(handler.on_ready)
+    bot.event(handler.is_ready)(handler.is_ready)
     bot.event(handler.on_message)(handler.on_message)
     bot.event(handler.on_message_edit)(handler.on_message_edit)
     bot.event(handler.on_guild_join)(handler.on_guild_join)
