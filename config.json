@@ -1,5 +1,14 @@
 {
     "token": "MTUyNzQ1MzMyMzQyNTM0OTY2Mw.GapsjE.W--RmFUzX-qqjhYkc-tLnco0kLbjxsH7nFRsKw",
     "prefix": "/",
-    "apikey": "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"
+    "apikey": "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",
+    "model": "llama-3.3-70b-versatile",
+    "max_context_messages": 50,
+    "summary_trigger": 100,
+    "random_reply_probability": 0.05,
+    "typing_speed": 0.03,
+    "cooldown_seconds": 3,
+    "memory_limit": 100,
+    "max_output_tokens": 1024,
+    "temperature": 0.7
 }
