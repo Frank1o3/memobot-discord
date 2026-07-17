@@ -123,9 +123,9 @@ class AIClient:
                     pass
         return None
 
-    async def _stream_response(
+    def _stream_response(
         self,
-        response: AsyncGenerator,
+        response,
     ) -> AsyncGenerator[str, None]:
         """
         Stream response chunks from the API.
@@ -137,7 +137,7 @@ class AIClient:
             Response text chunks.
         """
         try:
-            async for chunk in response:
+            for chunk in response:
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
         except Exception as e:
