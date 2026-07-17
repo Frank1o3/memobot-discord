@@ -412,11 +412,11 @@ def setup_event_handlers(
     handler = EventHandler(bot, config, ai_client, decision_maker, memory_manager)
 
     # Register event handlers
-    bot.event(handler.is_ready)(handler.is_ready)
-    bot.event(handler.on_message)(handler.on_message)
-    bot.event(handler.on_message_edit)(handler.on_message_edit)
-    bot.event(handler.on_guild_join)(handler.on_guild_join)
-    bot.event(handler.on_guild_remove)(handler.on_guild_remove)
+    bot.on_ready = handler.is_ready
+    bot.on_message = handler.on_message
+    bot.on_message_edit = handler.on_message_edit
+    bot.on_guild_join = handler.on_guild_join
+    bot.on_guild_remove = handler.on_guild_remove
 
     logger.info("Event handlers registered")
     return handler
