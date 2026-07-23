@@ -154,6 +154,88 @@ class DiscordAIChatBot:
             )
 
         @self._bot.tree.command(
+            name="clean",
+            description="Clean all chat messages in the current channel",
+        )
+        @discord.app_commands.checks.has_permissions(manage_messages=True)
+        async def slash_clean(interaction: discord.Interaction) -> None:
+            """Delete all messages in the current channel."""
+            if not isinstance(interaction.channel, discord.TextChannel):
+                await interaction.response.send_message(
+                    "❌ This command can only be used in a text channel.",
+                    ephemeral=True,
+                )
+                return
+
+            await interaction.response.defer(ephemeral=True)
+
+            try:
+                deleted_count = 0
+
+                # Delete messages in batches.
+                # Discord's bulk delete API only supports messages newer than 14 days,
+                # so older messages are deleted individually.
+                while True:
+                    messages = [
+                        message
+                        async for message in interaction.channel.history(limit=100)
+                    ]
+
+                    if not messages:
+                        break
+
+                    recent_messages = [
+                        message
+                        for message in messages
+                        if (discord.utils.utcnow() - message.created_at).days < 14
+                    ]
+
+                    old_messages = [
+                        message
+                        for message in messages
+                        if (discord.utils.utcnow() - message.created_at).days >= 14
+                    ]
+
+                    if recent_messages:
+                        deleted = await interaction.channel.purge(
+                            limit=len(recent_messages),
+                            check=lambda message: message in recent_messages,
+                        )
+                        deleted_count += len(deleted)
+
+                    for message in old_messages:
+                        try:
+                            await message.delete()
+                            deleted_count += 1
+                        except discord.HTTPException:
+                            logger.warning(
+                                "Failed to delete old message %s",
+                                message.id,
+                            )
+
+                    # If we only found old messages, the next iteration will
+                    # continue processing them until the channel is empty.
+                    if len(messages) < 100:
+                        break
+
+                await interaction.followup.send(
+                    f"🧹 Cleaned **{deleted_count}** messages from this channel.",
+                    ephemeral=True,
+                )
+
+            except discord.Forbidden:
+                await interaction.followup.send(
+                    "❌ I don't have permission to delete messages in this channel.",
+                    ephemeral=True,
+                )
+            except discord.HTTPException as e:
+                logger.error("Failed to clean channel: %s", e)
+                await interaction.followup.send(
+                    "❌ I couldn't clean the channel because Discord returned an error.",
+                    ephemeral=True,
+                )
+
+        @self._bot.tree.command(
             name="stats",
             description="View bot statistics and status",
         )
