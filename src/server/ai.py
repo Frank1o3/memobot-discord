@@ -168,7 +168,7 @@ class AIClient:
                 messages=messages,
                 stream=True,
             )
-            for chunk in stream:
+            for chunk in await stream:
                 yield chunk
 
         except APIError as e:

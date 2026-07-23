@@ -5,7 +5,7 @@
     "model": "llama-3.3-70b-versatile",
     "max_context_messages": 50,
     "summary_trigger": 100,
-    "random_reply_probability": 0.05,
+    "random_reply_probability": 0.35,
     "typing_speed": 0.03,
     "cooldown_seconds": 3,
     "memory_limit": 100,
