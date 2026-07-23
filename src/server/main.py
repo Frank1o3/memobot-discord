@@ -350,50 +350,6 @@ class DiscordAIChatBot:
             else:
                 await ctx.send("Unable to clear memories at this time")
 
-        @self._bot.command(
-            name="music",
-            help="Display music bot help and commands",
-        )
-        async def prefix_music_help(ctx: commands.Context) -> None:
-            """Display music bot help information via prefix command."""
-            embed = discord.Embed(
-                title="🎵 Music Bot Commands",
-                description="Here's how to use the music features:",
-                color=discord.Color.purple(),
-            )
-            embed.add_field(
-                name="🔊 Voice Control",
-                value=(
-                    f"`{self._config.prefix}join` - Join your voice channel\n"
-                    f"`{self._config.prefix}leave` - Leave the voice channel"
-                ),
-                inline=False,
-            )
-            embed.add_field(
-                name="🎵 Playback Control",
-                value=(
-                    f"`{self._config.prefix}play <URL/search>` - Play a song\n"
-                    f"`{self._config.prefix}pause` - Pause playback\n"
-                    f"`{self._config.prefix}resume` - Resume playback\n"
-                    f"`{self._config.prefix}skip` - Skip to next song\n"
-                    f"`{self._config.prefix}stop` - Stop and clear queue"
-                ),
-                inline=False,
-            )
-            embed.add_field(
-                name="📋 Queue Management",
-                value=(
-                    f"`{self._config.prefix}queue` - Show current queue\n"
-                    f"`{self._config.prefix}nowplaying` - Show current song\n"
-                    f"`{self._config.prefix}remove <#>` - Remove song from queue\n"
-                    f"`{self._config.prefix}volume <0-100>` - Set volume"
-                ),
-                inline=False,
-            )
-            embed.set_footer(text="Tip: You can use YouTube URLs or just search by song name!")
-
-            await ctx.send(embed=embed)
-
         logger.info("Commands registered")
 
     async def _setup_decision_maker(self) -> None:
