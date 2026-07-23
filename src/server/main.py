@@ -477,9 +477,9 @@ class DiscordAIChatBot:
             await self._bot.add_cog(MusicCog(self._bot))
             logger.info("Music cog loaded")
             
-            # Sync commands globally so they appear in all servers
-            synced = await self._bot.tree.sync()
-            logger.info(f"Synced {len(synced)} commands globally")
+            # Don't auto-sync on ready - let the owner use /sync or /syncglobal manually
+            # This prevents issues with sync commands not being available
+            logger.info("Bot is ready. Use !sync or !syncglobal to sync commands.")
             
             self._setup_event_handlers()
             logger.info(f"Bot is ready as {self._bot.user}")
