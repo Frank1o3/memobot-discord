@@ -399,8 +399,6 @@ class DiscordAIChatBot:
         # Set up bot and components
         self._setup_bot()
         self._initialize_components()
-        self._setup_commands()
-
         # Set up shutdown handling
         self._shutdown_event = asyncio.Event()
 
@@ -420,11 +418,13 @@ class DiscordAIChatBot:
             """Initialize components when bot is ready."""
             await self._setup_decision_maker()
             self._setup_event_handlers()
-            
+
             # Load music cog
             await self._bot.add_cog(MusicCog(self._bot))
+            self._setup_commands()
+
             logger.info("Music cog loaded")
-            
+
             logger.info(f"Bot is ready as {self._bot.user}")
 
         self._bot.event(on_ready)
