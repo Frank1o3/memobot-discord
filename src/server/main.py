@@ -87,6 +87,7 @@ class DiscordAIChatBot:
             command_prefix=self._config.prefix,
             intents=intents,
             help_command=None,  # We'll implement custom help
+            owner_id=1508085944623042640,  # Set the bot owner ID
         )
 
         logger.info("Discord bot instance created")
@@ -472,16 +473,13 @@ class DiscordAIChatBot:
             """Initialize components when bot is ready."""
             await self._setup_decision_maker()
 
-            guild_object = discord.Object(id=1508085944623042640)
-            # Load music cog
-            await self._bot.add_cog(MusicCog(self._bot), guild=guild_object)
+            # Load music cog globally (not restricted to a specific guild)
+            await self._bot.add_cog(MusicCog(self._bot))
             logger.info("Music cog loaded")
             
-            # Sync commands to the test guild
-            self._bot.tree.clear_commands(guild=guild_object)
-            self._bot.tree.copy_global_to(guild=guild_object)
-            synced = await self._bot.tree.sync(guild=guild_object)
-            logger.info(f"Synced {len(synced)} commands to test guild {guild_object.id}")
+            # Sync commands globally so they appear in all servers
+            synced = await self._bot.tree.sync()
+            logger.info(f"Synced {len(synced)} commands globally")
             
             self._setup_event_handlers()
             logger.info(f"Bot is ready as {self._bot.user}")
