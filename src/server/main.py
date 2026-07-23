@@ -8,6 +8,8 @@ This is the entry point for the bot, responsible for:
 - Running the bot with graceful shutdown handling
 """
 
+from dis import disco
+
 import asyncio
 import logging
 import signal
@@ -122,7 +124,7 @@ class DiscordAIChatBot:
             embed.add_field(
                 name="💬 Chatting",
                 value=(
-                    "• Mention me (@BotName) to get my attention\n"
+                    f"• Mention me (@{self._bot.user or 'BotName'}) to get my attention\n"
                     "• Reply to my messages to continue conversation\n"
                     "• I'll occasionally join conversations naturally\n"
                     "• I remember things you tell me about yourself!"
@@ -350,6 +352,23 @@ class DiscordAIChatBot:
             else:
                 await ctx.send("Unable to clear memories at this time")
 
+        @self._bot.command(name="sync", help="syncs commands to server")
+        @commands.is_owner()
+        async def sync(ctx: commands.Context) -> None:
+            guild_object = discord.Object(id=1508085944623042640)
+
+            if self._bot:
+                music_cog = self._bot.get_cog("MusicCog")
+                if music_cog:
+                    await self._bot.remove_cog("MusicCog")
+                    logger.info("Music cog unloaded")
+                    await self._bot.add_cog(MusicCog(self._bot), guild=ctx.guild or guild_object)
+
+            self._bot.tree.clear_commands(guild=ctx.guild or guild_object)
+            self._bot.tree.copy_global_to(guild=ctx.guild or guild_object)
+            synced = await self._bot.tree.sync(guild=ctx.guild or guild_object)
+            await ctx.send(f"Successfully synced {len(synced)} commands locally!")
+
         logger.info("Commands registered")
 
     async def _setup_decision_maker(self) -> None:
@@ -419,12 +438,15 @@ class DiscordAIChatBot:
         async def on_ready() -> None:
             """Initialize components when bot is ready."""
             await self._setup_decision_maker()
-            self._setup_event_handlers()
-            
+
+            guild_object = discord.Object(id=1508085944623042640)
             # Load music cog
-            await self._bot.add_cog(MusicCog(self._bot))
+            await self._bot.add_cog(MusicCog(self._bot), guild=guild_object)
             logger.info("Music cog loaded")
-            
+            self._bot.tree.clear_commands(guild=guild_object)
+            self._bot.tree.copy_global_to(guild=guild_object)
+            await self._bot.tree.sync(guild=guild_object)
+            self._setup_event_handlers()
             logger.info(f"Bot is ready as {self._bot.user}")
 
         self._bot.event(on_ready)

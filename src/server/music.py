@@ -258,7 +258,9 @@ class MusicCog(commands.Cog):
         voice_state = self.get_voice_state(ctx.guild.id)
 
         if voice_state.voice_client and voice_state.voice_client.is_connected():
-            await ctx.send(f"🎵 Already connected to {voice_state.voice_client.channel.name}")
+            await ctx.send(
+                f"🎵 Already connected to {voice_state.voice_client.channel.name}"
+            )
             return
 
         connected = await voice_state.connect(ctx.author.voice.channel)
@@ -294,7 +296,9 @@ class MusicCog(commands.Cog):
 
         if not voice_state.voice_client or not voice_state.voice_client.is_connected():
             if not ctx.author.voice or not ctx.author.voice.channel:
-                await ctx.send("❌ You need to be in a voice channel! Use `!join` first.")
+                await ctx.send(
+                    "❌ You need to be in a voice channel! Use `!join` first."
+                )
                 return
             connected = await voice_state.connect(ctx.author.voice.channel)
             if not connected:
@@ -467,7 +471,9 @@ class MusicCog(commands.Cog):
             duration = current["duration"]
             minutes = int(duration // 60)
             seconds = int(duration % 60)
-            embed.add_field(name="Duration", value=f"{minutes}:{seconds:02d}", inline=True)
+            embed.add_field(
+                name="Duration", value=f"{minutes}:{seconds:02d}", inline=True
+            )
         if current.get("thumbnail"):
             embed.set_thumbnail(url=current["thumbnail"])
 
@@ -482,7 +488,9 @@ class MusicCog(commands.Cog):
         voice_state = self.get_voice_state(ctx.guild.id)
 
         if index < 1 or index > voice_state.queue.size:
-            await ctx.send(f"❌ Invalid index! Queue has {voice_state.queue.size} songs.")
+            await ctx.send(
+                f"❌ Invalid index! Queue has {voice_state.queue.size} songs."
+            )
             return
 
         removed = voice_state.queue.remove(index - 1)
@@ -528,8 +536,7 @@ class MusicCog(commands.Cog):
         embed.add_field(
             name="🔊 Voice Control",
             value=(
-                "`!join` - Join your voice channel\n"
-                "`!leave` - Leave the voice channel"
+                "`!join` - Join your voice channel\n`!leave` - Leave the voice channel"
             ),
             inline=False,
         )
@@ -554,7 +561,9 @@ class MusicCog(commands.Cog):
             ),
             inline=False,
         )
-        embed.set_footer(text="Tip: You can use YouTube URLs or just search by song name!")
+        embed.set_footer(
+            text="Tip: You can use YouTube URLs or just search by song name!"
+        )
 
         await ctx.send(embed=embed)
 
