@@ -6,6 +6,8 @@ including the main message handling pipeline that coordinates between
 all other modules.
 """
 
+import dis
+
 import asyncio
 import logging
 import random

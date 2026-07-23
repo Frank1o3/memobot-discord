@@ -420,8 +420,21 @@ class DiscordAIChatBot:
             self._setup_event_handlers()
 
             # Load music cog
-            await self._bot.add_cog(MusicCog(self._bot))
+            await self._bot.add_cog(MusicCog(self._bot), override=True)
             self._setup_commands()
+            synced = await self._bot.tree.sync()
+
+            logger.info(
+                "Synced commands: %s",
+                [
+                    (
+                        command.name,
+                        type(command).__name__,
+                        getattr(command, "commands", None),
+                    )
+                    for command in synced
+                ],
+            )
 
             logger.info("Music cog loaded")
 
