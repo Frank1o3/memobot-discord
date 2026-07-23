@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: server
+Version: 0.1.0
+Summary: Add your description here
+Requires-Python: >=3.14
+Description-Content-Type: text/markdown
+Requires-Dist: discord-py[voice]>=2.7.1
+Requires-Dist: groq>=1.5.0
+Requires-Dist: pydantic>=2.13.4
+Requires-Dist: yt-dlp>=2024.1.0
