@@ -1,5 +1,5 @@
 """
-Music module for the Discord AI chatbot.
+Music cog for Discord AI chatbot.
 
 Provides slash commands for voice channel and music playback.
 """
@@ -562,7 +562,7 @@ class MusicCog(commands.Cog):
                 ephemeral=True,
             )
 
-    @app_commands.command(
+    @music.command(
         name="resume",
         description="Resume paused playback",
     )
@@ -915,3 +915,8 @@ class MusicCog(commands.Cog):
 
         for voice_state in self.voice_states.values():
             await voice_state.disconnect()
+
+
+async def setup(bot: commands.Bot) -> None:
+    """Load the MusicCog cog."""
+    await bot.add_cog(MusicCog(bot))
