@@ -352,22 +352,55 @@ class DiscordAIChatBot:
             else:
                 await ctx.send("Unable to clear memories at this time")
 
-        @self._bot.command(name="sync", help="syncs commands to server")
+        @self._bot.command(name="sync", help="Syncs slash commands to the server")
         @commands.is_owner()
-        async def sync(ctx: commands.Context) -> None:
-            guild_object = discord.Object(id=1508085944623042640)
+        async def sync(ctx: commands.Context, guild_id: str | None = None) -> None:
+            """Sync slash commands to the server.
+            
+            Args:
+                ctx: The command context.
+                guild_id: Optional guild ID to sync to. If not provided, uses the current guild.
+            """
+            try:
+                # Determine which guild to sync to
+                if guild_id:
+                    target_guild = discord.Object(id=int(guild_id))
+                elif ctx.guild:
+                    target_guild = ctx.guild
+                else:
+                    await ctx.send("❌ No guild specified. Usage: `/sync [guild_id]`")
+                    return
 
-            if self._bot:
-                music_cog = self._bot.get_cog("MusicCog")
-                if music_cog:
-                    await self._bot.remove_cog("MusicCog")
-                    logger.info("Music cog unloaded")
-                    await self._bot.add_cog(MusicCog(self._bot), guild=ctx.guild or guild_object)
+                # Clear existing commands for this guild
+                self._bot.tree.clear_commands(guild=target_guild)
+                
+                # Copy global commands to this guild
+                self._bot.tree.copy_global_to(guild=target_guild)
+                
+                # Sync the command tree
+                synced = await self._bot.tree.sync(guild=target_guild)
+                
+                await ctx.send(f"✅ Successfully synced {len(synced)} slash commands to the server!")
+                logger.info(f"Synced {len(synced)} commands to guild {target_guild.id}")
+                
+            except ValueError:
+                await ctx.send("❌ Invalid guild ID. Please provide a valid numeric guild ID.")
+            except Exception as e:
+                logger.error(f"Failed to sync commands: {e}")
+                await ctx.send(f"❌ Failed to sync commands: {e}")
 
-            self._bot.tree.clear_commands(guild=ctx.guild or guild_object)
-            self._bot.tree.copy_global_to(guild=ctx.guild or guild_object)
-            synced = await self._bot.tree.sync(guild=ctx.guild or guild_object)
-            await ctx.send(f"Successfully synced {len(synced)} commands locally!")
+        # Global sync command (syncs to all guilds)
+        @self._bot.command(name="syncglobal", help="Syncs slash commands globally")
+        @commands.is_owner()
+        async def sync_global(ctx: commands.Context) -> None:
+            """Sync slash commands globally (takes up to an hour to propagate)."""
+            try:
+                synced = await self._bot.tree.sync()
+                await ctx.send(f"✅ Successfully synced {len(synced)} commands globally!")
+                logger.info(f"Synced {len(synced)} commands globally")
+            except Exception as e:
+                logger.error(f"Failed to sync commands globally: {e}")
+                await ctx.send(f"❌ Failed to sync commands globally: {e}")
 
         logger.info("Commands registered")
 
@@ -443,9 +476,13 @@ class DiscordAIChatBot:
             # Load music cog
             await self._bot.add_cog(MusicCog(self._bot), guild=guild_object)
             logger.info("Music cog loaded")
+            
+            # Sync commands to the test guild
             self._bot.tree.clear_commands(guild=guild_object)
             self._bot.tree.copy_global_to(guild=guild_object)
-            await self._bot.tree.sync(guild=guild_object)
+            synced = await self._bot.tree.sync(guild=guild_object)
+            logger.info(f"Synced {len(synced)} commands to test guild {guild_object.id}")
+            
             self._setup_event_handlers()
             logger.info(f"Bot is ready as {self._bot.user}")
 
