@@ -16,7 +16,7 @@ import sys
 import discord
 from discord.ext import commands
 
-from server.ai import AIClient
+from server.ai_client import AIClient
 from server.config import config_manager, Config
 from server.decision import ReplyDecisionMaker
 from server.memory import MemoryManager
@@ -118,7 +118,12 @@ class DiscordAIChatBot:
         if self._bot is None:
             raise RuntimeError("Bot must be set up first")
 
-        if self._config is None or self._ai_client is None or self._decision_maker is None or self._memory_manager is None:
+        if (
+            self._config is None
+            or self._ai_client is None
+            or self._decision_maker is None
+            or self._memory_manager is None
+        ):
             raise RuntimeError("All components must be initialized first")
 
         # Import and load cogs
@@ -127,7 +132,7 @@ class DiscordAIChatBot:
         from server.cogs.music import MusicCog
 
         # Load BasicCog
-        await self._bot.add_cog(BasicCog(self._bot))
+        await self._bot.add_cog(BasicCog(self._bot), override=True)
         logger.info("BasicCog loaded")
 
         # Load AICog with dependencies
@@ -138,11 +143,11 @@ class DiscordAIChatBot:
             self._decision_maker,
             self._memory_manager,
         )
-        await self._bot.add_cog(ai_cog)
+        await self._bot.add_cog(ai_cog, override=True)
         logger.info("AICog loaded")
 
         # Load MusicCog
-        await self._bot.add_cog(MusicCog(self._bot))
+        await self._bot.add_cog(MusicCog(self._bot), override=True)
         logger.info("MusicCog loaded")
 
     async def _sync_commands(self) -> None:
