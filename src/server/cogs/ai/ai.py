@@ -14,7 +14,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from server.ai import AIClient
+from server.ai_client import AIClient
 from server.config import Config
 from server.context import (
     fetch_channel_history,
@@ -55,6 +55,7 @@ class AICog(commands.Cog):
 
         # Track active tasks for cleanup
         self._active_tasks: set[asyncio.Task] = set()
+        self.bot.on_message
 
         logger.info("AICog initialized")
 
@@ -144,7 +145,7 @@ class AICog(commands.Cog):
             await ctx.send(f"🗑️ Cleared {count} memories about you.")
         else:
             await ctx.send("Unable to clear memories at this time")
-
+    
     async def on_message(self, message: discord.Message) -> None:
         """
         Handle incoming messages for AI processing.
