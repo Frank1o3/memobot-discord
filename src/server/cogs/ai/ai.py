@@ -1,12 +1,9 @@
 """
-Events module for the Discord AI chatbot.
+AI cog for AI-related Discord commands and event handling.
 
-This module contains all event handlers and message processing logic,
-including the main message handling pipeline that coordinates between
-all other modules.
+Contains AI-specific slash commands and the on_message event handler
+for processing messages for AI responses.
 """
-
-import dis
 
 import asyncio
 import logging
@@ -14,6 +11,7 @@ import random
 from typing import TYPE_CHECKING
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 
 from server.ai import AIClient
@@ -38,16 +36,8 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class EventHandler:
-    """
-    Handles all Discord events and coordinates bot responses.
-
-    This class serves as the central coordinator between:
-    - Discord events (messages, reactions, etc.)
-    - AI inference (via AIClient)
-    - Decision making (via ReplyDecisionMaker)
-    - Memory management (via MemoryManager)
-    """
+class AICog(commands.Cog):
+    """AI cog responsible for AI-specific Discord functionality."""
 
     def __init__(
         self,
@@ -57,17 +47,7 @@ class EventHandler:
         decision_maker: ReplyDecisionMaker,
         memory_manager: MemoryManager,
     ) -> None:
-        """
-        Initialize the event handler.
-
-        Args:
-            bot: The Discord bot instance.
-            config: Bot configuration.
-            ai_client: AI client for Groq API.
-            decision_maker: Reply decision system.
-            memory_manager: Long-term memory manager.
-        """
-        self._bot = bot
+        self.bot = bot
         self._config = config
         self._ai_client = ai_client
         self._decision_maker = decision_maker
@@ -76,41 +56,98 @@ class EventHandler:
         # Track active tasks for cleanup
         self._active_tasks: set[asyncio.Task] = set()
 
-        logger.info("EventHandler initialized")
+        logger.info("AICog initialized")
 
-    async def is_ready(self) -> None:
-        """
-        Handle the bot ready event.
+    @app_commands.command(
+        name="stats",
+        description="View bot statistics and status",
+    )
+    async def stats(self, interaction: discord.Interaction) -> None:
+        """Show bot statistics."""
+        stats = self.get_stats()
+        embed = discord.Embed(
+            title="📊 Bot Statistics",
+            color=discord.Color.green(),
+        )
+        embed.add_field(
+            name="Memory",
+            value=(
+                f"Users: {stats['memory_stats']['total_users']}\n"
+                f"Total Memories: {stats['memory_stats']['total_memories']}"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="AI",
+            value=f"Model: {stats['ai_stats']['model']}",
+            inline=True,
+        )
+        embed.add_field(
+            name="Active Tasks",
+            value=str(stats["active_tasks"]),
+            inline=True,
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-        Syncs slash commands and performs initialization.
-        """
-        try:
-            # Sync slash commands
-            await self._bot.tree.sync()
-            logger.info(f"Logged in as {self._bot.user}")
-            logger.info(f"Bot ID: {self._bot.user.id}")
-            logger.info(f"Servers: {len(self._bot.guilds)}")
-
-            # Load memories
-            self._memory_manager.load()
-            logger.info(
-                f"Loaded {self._memory_manager.get_stats()['total_memories']} memories"
+    @app_commands.command(
+        name="clearmemories",
+        description="Clear all stored memories about you",
+    )
+    async def clearmemories(self, interaction: discord.Interaction) -> None:
+        """Clear user's stored memories."""
+        if self._memory_manager and interaction.user:
+            count = self._memory_manager.clear_user_memories(interaction.user.id)
+            await interaction.response.send_message(
+                f"🗑️ Cleared {count} memories about you.",
+                ephemeral=True,
+            )
+        else:
+            await interaction.response.send_message(
+                "Unable to clear memories at this time.",
+                ephemeral=True,
             )
 
-            # Log command info
-            slash_commands = len(self._bot.tree.get_commands())
-            prefix_commands = len(self._bot.commands)
-            logger.info(
-                f"Loaded {slash_commands} slash commands and {prefix_commands} prefix commands"
-            )
+    @commands.command(
+        name="stats",
+        help="View bot statistics",
+    )
+    async def prefix_stats(self, ctx: commands.Context) -> None:
+        """Show bot statistics via prefix command."""
+        stats = self.get_stats()
+        embed = discord.Embed(
+            title="📊 Bot Statistics",
+            color=discord.Color.green(),
+        )
+        embed.add_field(
+            name="Memory",
+            value=(
+                f"Users: {stats['memory_stats']['total_users']}\n"
+                f"Total Memories: {stats['memory_stats']['total_memories']}"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="AI",
+            value=f"Model: {stats['ai_stats']['model']}",
+            inline=True,
+        )
+        await ctx.send(embed=embed)
 
-        except Exception as e:
-            logger.error(f"Error during is_ready: {e}")
-            raise
+    @commands.command(
+        name="clearmemories",
+        help="Clear all stored memories about you",
+    )
+    async def prefix_clear_memories(self, ctx: commands.Context) -> None:
+        """Clear user's stored memories via prefix command."""
+        if self._memory_manager and ctx.author:
+            count = self._memory_manager.clear_user_memories(ctx.author.id)
+            await ctx.send(f"🗑️ Cleared {count} memories about you.")
+        else:
+            await ctx.send("Unable to clear memories at this time")
 
     async def on_message(self, message: discord.Message) -> None:
         """
-        Handle incoming messages.
+        Handle incoming messages for AI processing.
 
         This is the main message processing pipeline that:
         1. Ignores bot messages (except own)
@@ -123,7 +160,7 @@ class EventHandler:
             message: The Discord message to process.
         """
         # Ignore our own messages
-        if message.author == self._bot.user:
+        if message.author == self.bot.user:
             return
 
         # Ignore other bot messages
@@ -174,7 +211,7 @@ class EventHandler:
                 # Build context
                 context_str, formatted_messages = build_context(
                     history,
-                    self._bot.user,
+                    self.bot.user,
                     self._config.max_context_messages,
                 )
 
@@ -319,46 +356,17 @@ class EventHandler:
             self._active_tasks.add(task)
             task.add_done_callback(self._active_tasks.discard)
 
-    async def on_guild_join(self, guild: discord.Guild) -> None:
-        """
-        Handle joining a new guild/server.
+    def get_stats(self) -> dict:
+        """Get statistics about the AI cog."""
+        return {
+            "active_tasks": len(self._active_tasks),
+            "memory_stats": self._memory_manager.get_stats(),
+            "ai_stats": self._ai_client.get_stats(),
+        }
 
-        Args:
-            guild: The guild that was joined.
-        """
-        logger.info(f"Joined guild {guild.name} ({guild.id})")
-
-        # Try to send a welcome message to a general channel
-        for channel in guild.text_channels:
-            if (
-                "general" in channel.name.lower()
-                or channel.permissions_for(guild.me).send_messages
-            ):
-                try:
-                    await channel.send(
-                        "👋 Hey there! I'm your friendly AI assistant. "
-                        "Mention me or use `/help` to get started!"
-                    )
-                    break
-                except discord.Forbidden:
-                    continue
-
-    async def on_guild_remove(self, guild: discord.Guild) -> None:
-        """
-        Handle leaving a guild/server.
-
-        Args:
-            guild: The guild that was left.
-        """
-        logger.info(f"Left guild {guild.name} ({guild.id})")
-
-    async def cleanup(self) -> None:
-        """
-        Clean up active tasks and resources.
-
-        Called during graceful shutdown.
-        """
-        logger.info("Cleaning up event handler...")
+    async def cog_unload(self) -> None:
+        """Clean up when cog is unloaded."""
+        logger.info("Cleaning up AICog...")
 
         # Cancel active tasks
         for task in self._active_tasks:
@@ -375,50 +383,16 @@ class EventHandler:
         # Cleanup decision maker
         self._decision_maker.cleanup()
 
-        logger.info("Event handler cleanup complete")
-
-    def get_stats(self) -> dict:
-        """
-        Get statistics about the event handler.
-
-        Returns:
-            Dictionary with handler statistics.
-        """
-        return {
-            "active_tasks": len(self._active_tasks),
-            "memory_stats": self._memory_manager.get_stats(),
-            "ai_stats": self._ai_client.get_stats(),
-        }
+        logger.info("AICog cleanup complete")
 
 
-def setup_event_handlers(
+async def setup(
     bot: commands.Bot,
     config: Config,
     ai_client: AIClient,
     decision_maker: ReplyDecisionMaker,
     memory_manager: MemoryManager,
-) -> EventHandler:
-    """
-    Set up all event handlers on the bot.
-
-    Args:
-        bot: The Discord bot instance.
-        config: Bot configuration.
-        ai_client: AI client for Groq API.
-        decision_maker: Reply decision system.
-        memory_manager: Long-term memory manager.
-
-    Returns:
-        The created EventHandler instance.
-    """
-    handler = EventHandler(bot, config, ai_client, decision_maker, memory_manager)
-
-    # Register event handlers
-    bot.on_ready = handler.is_ready
-    bot.on_message = handler.on_message
-    bot.on_message_edit = handler.on_message_edit
-    bot.on_guild_join = handler.on_guild_join
-    bot.on_guild_remove = handler.on_guild_remove
-
-    logger.info("Event handlers registered")
-    return handler
+) -> None:
+    """Load the AICog cog with dependencies."""
+    cog = AICog(bot, config, ai_client, decision_maker, memory_manager)
+    await bot.add_cog(cog)
