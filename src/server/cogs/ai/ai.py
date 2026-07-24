@@ -327,7 +327,17 @@ class AICog(commands.Cog):
         elif tool_name == "queue":
             await self._handle_queue_tool(message, player, attributes)
         elif tool_name == "skip":
-            await self._handle_skip(message, player)
+            await self._handle_skip(message, player, attributes)
+        elif tool_name == "pause":
+            await self._handle_pause(message, player)
+        elif tool_name == "resume":
+            await self._handle_resume(message, player)
+        elif tool_name == "stop":
+            await self._handle_stop(message, player)
+        elif tool_name == "loop":
+            await self._handle_loop(message, player)
+        elif tool_name == "volume":
+            await self._handle_volume(message, player, attributes)
         else:
             logger.debug(f"Unknown tool: {tool_name}")
 
@@ -454,8 +464,9 @@ class AICog(commands.Cog):
         self,
         message: discord.Message,
         player,
+        attributes: dict[str, str],
     ) -> None:
-        """Handle skip tool call."""
+        """Handle skip tool call with optional query to skip to specific song."""
         if not player.voice_client or not player.voice_client.is_connected():
             logger.debug("Not in a voice channel, cannot skip")
             return
@@ -464,11 +475,127 @@ class AICog(commands.Cog):
             logger.debug("Nothing is playing, cannot skip")
             return
 
+        # Check if query is provided to skip to a specific song
+        query = attributes.get("query", "")
+        
+        if query:
+            # Search for the song in the queue and skip to it
+            found_index = None
+            for i, track in enumerate(player.queue):
+                if query.lower() in track.title.lower():
+                    found_index = i
+                    break
+            
+            if found_index is not None:
+                # Move all tracks before the found track to the back of queue
+                # or simply remove them from history perspective
+                for _ in range(found_index + 1):
+                    if player.queue:
+                        next_track = player.queue.popleft()
+                        if _ == found_index:
+                            # This is the target track, play it
+                            await player.play(next_track)
+                            logger.info(f"Skipped to {next_track.title} via tool call")
+                            break
+                        else:
+                            # Archive skipped tracks to history
+                            if player.current_track:
+                                player.history.append(player.current_track)
+                            player._current_track = next_track
+                return
+            else:
+                logger.debug(f"Song '{query}' not found in queue, doing normal skip")
+        
+        # Normal skip behavior
         had_next = await player.play_next()
         if had_next:
             logger.info(f"Skipped to {player.current_track.title if player.current_track else 'Unknown'} via tool call")
         else:
             logger.info("Stopped playback (no more tracks) via tool call")
+
+    async def _handle_pause(
+        self,
+        message: discord.Message,
+        player,
+    ) -> None:
+        """Handle pause tool call."""
+        if not player.voice_client or not player.voice_client.is_connected():
+            logger.debug("Not in a voice channel, cannot pause")
+            return
+
+        if player.state != "playing":
+            logger.debug("Nothing is playing, cannot pause")
+            return
+
+        paused = player.pause()
+        if paused:
+            logger.info("Playback paused via tool call")
+
+    async def _handle_resume(
+        self,
+        message: discord.Message,
+        player,
+    ) -> None:
+        """Handle resume tool call."""
+        if not player.voice_client or not player.voice_client.is_connected():
+            logger.debug("Not in a voice channel, cannot resume")
+            return
+
+        if player.state != "paused":
+            logger.debug("Nothing is paused, cannot resume")
+            return
+
+        resumed = player.resume()
+        if resumed:
+            logger.info("Playback resumed via tool call")
+
+    async def _handle_stop(
+        self,
+        message: discord.Message,
+        player,
+    ) -> None:
+        """Handle stop tool call."""
+        if not player.voice_client or not player.voice_client.is_connected():
+            logger.debug("Not in a voice channel, cannot stop")
+            return
+
+        player.stop()
+        logger.info("Playback stopped and queue cleared via tool call")
+
+    async def _handle_loop(
+        self,
+        message: discord.Message,
+        player,
+    ) -> None:
+        """Handle loop tool call - toggle repeat mode."""
+        if not player.voice_client or not player.voice_client.is_connected():
+            logger.debug("Not in a voice channel, cannot toggle loop")
+            return
+
+        new_mode = player.toggle_repeat()
+        logger.info(f"Loop mode set to {new_mode} via tool call")
+
+    async def _handle_volume(
+        self,
+        message: discord.Message,
+        player,
+        attributes: dict[str, str],
+    ) -> None:
+        """Handle volume tool call with level attribute."""
+        if not player.voice_client or not player.voice_client.is_connected():
+            logger.debug("Not in a voice channel, cannot change volume")
+            return
+
+        level_str = attributes.get("level", "")
+        try:
+            level = int(level_str)
+            if 0 <= level <= 100:
+                player.set_volume(level)
+                logger.info(f"Volume set to {level}% via tool call")
+            else:
+                logger.debug(f"Invalid volume level: {level}")
+        except ValueError:
+            logger.debug(f"Could not parse volume level: {level_str}")
 
     @commands.Cog.listener()
     async def on_message_edit(
