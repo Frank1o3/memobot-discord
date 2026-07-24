@@ -8,7 +8,6 @@ for processing messages for AI responses.
 import asyncio
 import logging
 import random
-from typing import TYPE_CHECKING
 
 import discord
 from discord import app_commands
@@ -17,21 +16,17 @@ from discord.ext import commands
 from server.ai_client import AIClient
 from server.config import Config
 from server.context import (
-    fetch_channel_history,
     build_context,
     extract_recent_conversation,
+    fetch_channel_history,
     should_summarize,
 )
 from server.decision import ReplyDecisionMaker
 from server.memory import MemoryManager
 from server.prompts import (
-    build_system_prompt,
-    RATE_LIMIT_RESPONSE,
     ERROR_RESPONSES,
+    build_system_prompt,
 )
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -58,58 +53,9 @@ class AICog(commands.Cog):
 
         logger.info("AICog initialized")
 
-    @app_commands.command(
+    @commands.hybrid_command(
         name="stats",
         description="View bot statistics and status",
-    )
-    async def stats(self, interaction: discord.Interaction) -> None:
-        """Show bot statistics."""
-        stats = self.get_stats()
-        embed = discord.Embed(
-            title="📊 Bot Statistics",
-            color=discord.Color.green(),
-        )
-        embed.add_field(
-            name="Memory",
-            value=(
-                f"Users: {stats['memory_stats']['total_users']}\n"
-                f"Total Memories: {stats['memory_stats']['total_memories']}"
-            ),
-            inline=True,
-        )
-        embed.add_field(
-            name="AI",
-            value=f"Model: {stats['ai_stats']['model']}",
-            inline=True,
-        )
-        embed.add_field(
-            name="Active Tasks",
-            value=str(stats["active_tasks"]),
-            inline=True,
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-
-    @app_commands.command(
-        name="clearmemories",
-        description="Clear all stored memories about you",
-    )
-    async def clearmemories(self, interaction: discord.Interaction) -> None:
-        """Clear user's stored memories."""
-        if self._memory_manager and interaction.user:
-            count = self._memory_manager.clear_user_memories(interaction.user.id)
-            await interaction.response.send_message(
-                f"🗑️ Cleared {count} memories about you.",
-                ephemeral=True,
-            )
-        else:
-            await interaction.response.send_message(
-                "Unable to clear memories at this time.",
-                ephemeral=True,
-            )
-
-    @commands.command(
-        name="stats",
-        help="View bot statistics",
     )
     async def prefix_stats(self, ctx: commands.Context) -> None:
         """Show bot statistics via prefix command."""
@@ -133,7 +79,7 @@ class AICog(commands.Cog):
         )
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="clearmemories",
         help="Clear all stored memories about you",
     )
@@ -144,7 +90,8 @@ class AICog(commands.Cog):
             await ctx.send(f"🗑️ Cleared {count} memories about you.")
         else:
             await ctx.send("Unable to clear memories at this time")
-    
+
+    @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         """
         Handle incoming messages for AI processing.
@@ -296,9 +243,7 @@ class AICog(commands.Cog):
                     )
 
             # Check if summarization is needed
-            if should_summarize(
-                len(formatted_messages), self._config.summary_trigger
-            ):
+            if should_summarize(len(formatted_messages), self._config.summary_trigger):
                 logger.info("Context size exceeded threshold, would summarize")
                 # Summarization logic could be added here
 
@@ -311,6 +256,7 @@ class AICog(commands.Cog):
         except Exception as e:
             logger.error(f"Unexpected error handling response: {e}", exc_info=True)
 
+    @commands.Cog.listener()
     async def on_message_edit(
         self,
         before: discord.Message,
