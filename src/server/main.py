@@ -295,5 +295,8 @@ async def run() -> None:
         bot_instance = None
 
 
-if __name__ == "__main__":
+def main() -> None:
     asyncio.run(run())
+
+if __name__ == '__main__':
+    main()
