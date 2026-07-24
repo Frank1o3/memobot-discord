@@ -1,51 +1,33 @@
-# Python
+```
+# Compiled Python files
 *.pyc
 __pycache__/
-*.pyo
-*.pyd
-*.egg-info/
-*.so
-*.dylib
-*.dll
 
 # Dependencies
 .venv/
 venv/
-env/
+node_modules/
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+
+# Environment files
 .env
 .env.local
-.env.*
-
-# Build artifacts
-build/
-dist/
-*.egg
-*.whl
-
-# Logs
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
+*.env.*
 
 # Editors
 .vscode/
 .idea/
-*.swp
-*.swo
-*.tmp
 
-# Testing
+# Coverage reports
 .coverage
 coverage/
 htmlcov/
-.pytest_cache/
+
+# Python cache
 .mypy_cache/
-
-# Distribution
-*.tar.gz
-*.zip
-
-# Bot configuration (contains sensitive tokens — use config.example.json as template)
-config.json
+.pytest_cache/
+```
