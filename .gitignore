@@ -1,6 +1,50 @@
-__pycache__/
+```
+# Python
 *.pyc
+__pycache__/
 *.pyo
 *.pyd
-.venv
-*.json
+*.egg-info/
+*.so
+*.dylib
+*.dll
+
+# Dependencies
+.venv/
+venv/
+env/
+.env
+.env.local
+.env.*
+
+# Build artifacts
+build/
+dist/
+*.egg
+*.whl
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*.tmp
+
+# Testing
+.coverage
+coverage/
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+
+# Distribution
+*.tar.gz
+*.zip
+```
