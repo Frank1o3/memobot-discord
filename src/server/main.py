@@ -135,20 +135,22 @@ class DiscordAIChatBot:
         await self._bot.add_cog(BasicCog(self._bot), override=True)
         logger.info("BasicCog loaded")
 
-        # Load AICog with dependencies
+        # Load MusicCog first (needed by AICog for tool calls)
+        music_cog = MusicCog(self._bot)
+        await self._bot.add_cog(music_cog, override=True)
+        logger.info("MusicCog loaded")
+
+        # Load AICog with dependencies (including music_cog for tool execution)
         ai_cog = AICog(
             self._bot,
             self._config,
             self._ai_client,
             self._decision_maker,
             self._memory_manager,
+            music_cog,
         )
         await self._bot.add_cog(ai_cog, override=True)
         logger.info("AICog loaded")
-
-        # Load MusicCog
-        await self._bot.add_cog(MusicCog(self._bot), override=True)
-        logger.info("MusicCog loaded")
 
     async def _sync_commands(self) -> None:
         """Sync application commands with Discord."""

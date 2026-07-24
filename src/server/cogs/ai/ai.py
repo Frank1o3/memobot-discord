@@ -21,6 +21,7 @@ from server.context import (
     fetch_channel_history,
     should_summarize,
 )
+from server.cogs.ai.parser import parse_tool_calls
 from server.decision import ReplyDecisionMaker
 from server.memory import MemoryManager
 from server.prompts import (
@@ -41,12 +42,14 @@ class AICog(commands.Cog):
         ai_client: AIClient,
         decision_maker: ReplyDecisionMaker,
         memory_manager: MemoryManager,
+        music_cog: "MusicCog | None" = None,
     ) -> None:
         self.bot = bot
         self._config = config
         self._ai_client = ai_client
         self._decision_maker = decision_maker
         self._memory_manager = memory_manager
+        self._music_cog = music_cog
 
         # Track active tasks for cleanup
         self._active_tasks: set[asyncio.Task] = set()
@@ -211,6 +214,16 @@ class AICog(commands.Cog):
             if not response_text.strip():
                 response_text = random.choice(ERROR_RESPONSES)
 
+            # Parse and execute tool calls from the AI response
+            cleaned_response, tool_calls = parse_tool_calls(response_text)
+            
+            # Execute any tool calls found
+            if tool_calls:
+                await self._execute_tool_calls(message, tool_calls)
+            
+            # Use cleaned response (with tools removed) for display
+            response_text = cleaned_response if cleaned_response else response_text
+
             # Simulate typing based on response length
             typing_duration = min(
                 len(response_text) * self._config.typing_speed,
@@ -222,10 +235,11 @@ class AICog(commands.Cog):
                 await asyncio.sleep(typing_duration)
 
             # Send response - prefer reply if triggered by reply/mention
-            if reason in ("reply_to_bot", "mentioned"):
-                await message.reply(response_text)
-            else:
-                await channel.send(response_text)
+            if response_text:  # Only send if there's text to send
+                if reason in ("reply_to_bot", "mentioned"):
+                    await message.reply(response_text)
+                else:
+                    await channel.send(response_text)
 
             # Record the response
             self._decision_maker.record_response(message.author.id)
@@ -256,6 +270,205 @@ class AICog(commands.Cog):
             logger.error(f"Failed to send message: {e}")
         except Exception as e:
             logger.error(f"Unexpected error handling response: {e}", exc_info=True)
+
+    async def _execute_tool_calls(
+        self,
+        message: discord.Message,
+        tool_calls: list,
+    ) -> None:
+        """
+        Execute tool calls from the AI response.
+
+        Args:
+            message: The triggering Discord message.
+            tool_calls: List of parsed ToolCall objects.
+        """
+        if not self._music_cog:
+            logger.debug("Music cog not available, skipping tool execution")
+            return
+
+        if not message.guild:
+            logger.debug("Tool calls only work in guilds")
+            return
+
+        guild_id = message.guild.id
+        player = self._music_cog.get_player(guild_id)
+
+        for tool_call in tool_calls:
+            try:
+                await self._execute_single_tool(message, tool_call, player)
+            except Exception as e:
+                logger.error(
+                    f"Failed to execute tool {tool_call.name}: {e}",
+                    exc_info=True,
+                )
+
+    async def _execute_single_tool(
+        self,
+        message: discord.Message,
+        tool_call,
+        player,
+    ) -> None:
+        """
+        Execute a single tool call.
+
+        Args:
+            message: The triggering Discord message.
+            tool_call: The ToolCall object to execute.
+            player: The GuildPlayer instance for this guild.
+        """
+        tool_name = tool_call.name
+        attributes = tool_call.attributes
+
+        if tool_name == "join_vc":
+            await self._handle_join_vc(message, player)
+        elif tool_name == "leave_vc":
+            await self._handle_leave_vc(message, player)
+        elif tool_name == "queue":
+            await self._handle_queue_tool(message, player, attributes)
+        elif tool_name == "skip":
+            await self._handle_skip(message, player)
+        else:
+            logger.debug(f"Unknown tool: {tool_name}")
+
+    async def _handle_join_vc(
+        self,
+        message: discord.Message,
+        player,
+    ) -> None:
+        """Handle join_vc tool call."""
+        if not message.author.voice or not message.author.voice.channel:
+            logger.debug("User not in voice channel, cannot join")
+            return
+
+        channel = message.author.voice.channel
+        if not isinstance(channel, discord.VoiceChannel):
+            logger.debug("User not in a regular voice channel")
+            return
+
+        if player.voice_client and player.voice_client.is_connected():
+            logger.debug("Already connected to voice channel")
+            return
+
+        await player.connect(channel)
+        logger.info(f"Joined voice channel {channel.name} via tool call")
+
+    async def _handle_leave_vc(
+        self,
+        message: discord.Message,
+        player,
+    ) -> None:
+        """Handle leave_vc tool call."""
+        if not player.voice_client or not player.voice_client.is_connected():
+            logger.debug("Not in a voice channel, cannot leave")
+            return
+
+        await player.disconnect()
+        logger.info("Left voice channel via tool call")
+
+    async def _handle_queue_tool(
+        self,
+        message: discord.Message,
+        player,
+        attributes: dict[str, str],
+    ) -> None:
+        """Handle queue tool call with action and query attributes."""
+        action = attributes.get("action", "")
+        query = attributes.get("query", "")
+
+        if not query:
+            logger.debug("Queue tool called without query")
+            return
+
+        if action == "add":
+            await self._handle_queue_add(message, player, query)
+        elif action == "remove":
+            await self._handle_queue_remove(message, player, query)
+        else:
+            logger.debug(f"Unknown queue action: {action}")
+
+    async def _handle_queue_add(
+        self,
+        message: discord.Message,
+        player,
+        query: str,
+    ) -> None:
+        """Handle queue add action."""
+        if not message.guild:
+            return
+
+        # Auto-join if not connected
+        if not player.voice_client or not player.voice_client.is_connected():
+            if message.author.voice and message.author.voice.channel:
+                channel = message.author.voice.channel
+                if isinstance(channel, discord.VoiceChannel):
+                    await player.connect(channel)
+                else:
+                    return
+            else:
+                return
+
+        # Resolve the query
+        result = await self._music_cog._resolver.resolve(
+            query,
+            requested_by=message.author,
+        )
+
+        if not result.tracks:
+            logger.debug(f"Could not find track for query: {query}")
+            return
+
+        track = result.tracks[0]
+        player.add_to_queue(track)
+
+        was_idle = player.state == "stopped"
+
+        if was_idle:
+            success = await player.play(track)
+            # Remove from queue since play() doesn't pop it
+            if success and track in player.queue:
+                player.queue.remove(track)
+
+            logger.info(f"Started playing {track.title} via tool call")
+        else:
+            logger.info(f"Added {track.title} to queue via tool call")
+
+    async def _handle_queue_remove(
+        self,
+        message: discord.Message,
+        player,
+        query: str,
+    ) -> None:
+        """Handle queue remove action - remove by song name."""
+        # Search for matching track in queue
+        for i, track in enumerate(player.queue):
+            if query.lower() in track.title.lower():
+                removed = player.remove_from_queue(i)
+                if removed:
+                    logger.info(f"Removed {removed.title} from queue via tool call")
+                return
+
+        logger.debug(f"No matching track found in queue for: {query}")
+
+    async def _handle_skip(
+        self,
+        message: discord.Message,
+        player,
+    ) -> None:
+        """Handle skip tool call."""
+        if not player.voice_client or not player.voice_client.is_connected():
+            logger.debug("Not in a voice channel, cannot skip")
+            return
+
+        if player.state == "stopped" or not player.current_track:
+            logger.debug("Nothing is playing, cannot skip")
+            return
+
+        had_next = await player.play_next()
+        if had_next:
+            logger.info(f"Skipped to {player.current_track.title if player.current_track else 'Unknown'} via tool call")
+        else:
+            logger.info("Stopped playback (no more tracks) via tool call")
 
     @commands.Cog.listener()
     async def on_message_edit(
