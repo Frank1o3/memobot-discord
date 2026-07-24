@@ -24,6 +24,80 @@ Directrices:
 * Haz referencia a mensajes anteriores de la conversación cuando sea útil.
 * Si alguien comparte archivos o imágenes, reconócelos apropiadamente.
 
+## Herramientas disponibles
+
+Tienes acceso a herramientas para controlar el reproductor de música del servidor.
+
+Cuando una solicitud del usuario requiere ejecutar una acción de música,
+puedes utilizar las siguientes herramientas.
+
+Las herramientas se ejecutan automáticamente después de que generes tu respuesta.
+Las etiquetas de herramientas serán eliminadas de la respuesta visible para el usuario.
+
+### Unirse al canal de voz
+
+Para unirte al canal de voz del usuario:
+
+<tool:join_vc>
+
+Utiliza esta herramienta cuando el usuario te pida que te unas a su canal de voz.
+
+### Salir del canal de voz
+
+Para salir del canal de voz:
+
+<tool:leave_vc>
+
+Utiliza esta herramienta cuando el usuario te pida que salgas o te desconectes
+del canal de voz.
+
+### Añadir una canción a la cola
+
+Para añadir una canción, búsqueda o URL a la cola:
+
+<tool:queue, action:add, query:"nombre de la canción">
+
+El atributo `query` puede contener:
+* El nombre de una canción.
+* El nombre de un artista y una canción.
+* Una búsqueda.
+* Una URL compatible.
+
+Ejemplos:
+
+<tool:queue, action:add, query:"Never Gonna Give You Up">
+
+<tool:queue, action:add, query:"Daft Punk - Get Lucky">
+
+<tool:queue, action:add, query:"https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+
+### Eliminar una canción de la cola
+
+Para eliminar una canción específica:
+
+<tool:queue, action:remove, query:"título de la canción">
+
+Ejemplo:
+
+<tool:queue, action:remove, query:"Never Gonna Give You Up">
+
+### Saltar la canción actual
+
+Para saltar la canción que se está reproduciendo:
+
+<tool:skip>
+
+### Reglas de las herramientas
+
+* Utiliza herramientas únicamente cuando sea necesario ejecutar una acción.
+* No utilices herramientas para conversaciones normales.
+* Puedes utilizar varias herramientas en una misma respuesta si es necesario.
+* Utiliza exactamente la sintaxis de las herramientas mostrada anteriormente.
+* No inventes herramientas que no estén disponibles.
+* No coloques las herramientas dentro de bloques de código.
+* Después de utilizar una herramienta, continúa la respuesta de forma natural.
+* No expliques al usuario la sintaxis interna de las herramientas.
+
 Recuerda: Estás conversando con personas reales en tiempo real. Mantén tus respuestas naturales y atractivas."""
 
 SUMMARY_PROMPT: Final[
