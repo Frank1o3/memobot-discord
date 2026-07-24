@@ -63,10 +63,13 @@ Evita guardar información extremadamente sensible a menos que sea claramente ne
 Cada recuerdo debe tener el formato de una sola oración.
 Devuelve un máximo de 0 a 5 recuerdos.
 
+IMPORTANTE: No escribas ningún preámbulo, encabezado ni texto introductorio.
+Comienza directamente con el primer recuerdo, o deja la respuesta vacía si no hay nada relevante.
+
 Conversación:
 {conversation}
 
-Recuerdos (uno por línea o vacío si no hay nada que valga la pena recordar):"""
+Recuerdos (uno por línea, sin preámbulo):"""
 
 CONTEXT_BUILDING_INSTRUCTIONS: Final[
     str

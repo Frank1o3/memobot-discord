@@ -1,0 +1,15 @@
+{
+  "_comment": "Copy this file to config.json and fill in your real values. config.json is gitignored.",
+  "token": "YOUR_DISCORD_BOT_TOKEN_HERE",
+  "apikey": "YOUR_GROQ_API_KEY_HERE",
+  "prefix": "!",
+  "model": "llama-3.3-70b-versatile",
+  "max_context_messages": 20,
+  "max_output_tokens": 512,
+  "temperature": 0.7,
+  "typing_speed": 0.05,
+  "summary_trigger": 50,
+  "memory_file": "memories.json",
+  "random_reply_chance": 0.05,
+  "bot_name": "Memo"
+}

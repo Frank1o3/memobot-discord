@@ -55,7 +55,6 @@ class AICog(commands.Cog):
 
         # Track active tasks for cleanup
         self._active_tasks: set[asyncio.Task] = set()
-        self.bot.on_message
 
         logger.info("AICog initialized")
 
@@ -201,116 +200,109 @@ class AICog(commands.Cog):
         channel = message.channel
 
         try:
-            # Check rate limit
-            if not self._decision_maker._is_on_cooldown(message.author.id):
-                # Fetch channel history
-                history = await fetch_channel_history(
-                    channel,
-                    limit=self._config.max_context_messages + 20,
-                )
+            # Fetch channel history
+            history = await fetch_channel_history(
+                channel,
+                limit=self._config.max_context_messages + 20,
+            )
 
-                # Build context
-                context_str, formatted_messages = build_context(
-                    history,
-                    self.bot.user,
-                    self._config.max_context_messages,
-                )
+            # Build context
+            context_str, formatted_messages = build_context(
+                history,
+                self.bot.user,
+                self._config.max_context_messages,
+            )
 
-                # Get user's relevant memories
-                memory_context = self._memory_manager.get_relevant_context(
-                    message.author.id,
-                    context_str,
-                    message.author.display_name,
-                )
+            # Get user's relevant memories
+            memory_context = self._memory_manager.get_relevant_context(
+                message.author.id,
+                context_str,
+                message.author.display_name,
+            )
 
-                # Build messages for AI
-                system_prompt = build_system_prompt()
-                if memory_context:
-                    system_prompt += "\n\n" + memory_context
+            # Build messages for AI
+            system_prompt = build_system_prompt()
+            if memory_context:
+                system_prompt += "\n\n" + memory_context
 
-                # Format conversation for AI
-                user_messages = []
-                if context_str:
-                    user_messages.append(
-                        {
-                            "role": "user",
-                            "content": f"Conversation context:\n{context_str}",
-                        }
-                    )
-
-                # Add the current message
-                current_msg_content = message.content or "[No text content]"
-
-                # Include attachment info
-                if message.attachments:
-                    attachment_info = ", ".join(
-                        f"[File: {a.filename}]({a.url})" for a in message.attachments
-                    )
-                    current_msg_content += f"\n\nAttachments: {attachment_info}"
-
+            # Format conversation for AI
+            user_messages = []
+            if context_str:
                 user_messages.append(
                     {
                         "role": "user",
-                        "content": f"{message.author.display_name}: {current_msg_content}",
+                        "content": f"Conversation context:\n{context_str}",
                     }
                 )
 
-                # Generate response
-                response_text = ""
-                async for chunk in self._ai_client.generate_response(
-                    system_prompt,
-                    user_messages,
-                ):
-                    response_text += chunk
+            # Add the current message
+            current_msg_content = message.content or "[No text content]"
 
-                if not response_text.strip():
-                    response_text = random.choice(ERROR_RESPONSES)
-
-                # Simulate typing based on response length
-                typing_duration = min(
-                    len(response_text) * self._config.typing_speed,
-                    10.0,  # Cap at 10 seconds
+            # Include attachment info
+            if message.attachments:
+                attachment_info = ", ".join(
+                    f"[File: {a.filename}]({a.url})" for a in message.attachments
                 )
+                current_msg_content += f"\n\nAttachments: {attachment_info}"
 
-                if typing_duration > 0.5:
-                    await channel.typing()
-                    await asyncio.sleep(typing_duration)
+            user_messages.append(
+                {
+                    "role": "user",
+                    "content": f"{message.author.display_name}: {current_msg_content}",
+                }
+            )
 
-                # Send response - prefer reply if triggered by reply/mention
-                if reason in ("reply_to_bot", "mentioned"):
-                    await message.reply(response_text)
-                else:
-                    await channel.send(response_text)
+            # Generate response
+            response_text = ""
+            async for chunk in self._ai_client.generate_response(
+                system_prompt,
+                user_messages,
+            ):
+                response_text += chunk
 
-                # Record the response
-                self._decision_maker.record_response(message.author.id)
-                self._decision_maker.record_bot_response_in_channel(channel.id)
+            if not response_text.strip():
+                response_text = random.choice(ERROR_RESPONSES)
 
-                # Extract and save memories periodically
-                if len(formatted_messages) >= 10:
-                    recent_conv = extract_recent_conversation(formatted_messages)
-                    memories = await self._ai_client.extract_memories(recent_conv)
-                    if memories:
-                        self._memory_manager.add_memories_from_text(
-                            message.author.id,
-                            message.author.display_name,
-                            recent_conv,
-                            memories,
-                        )
+            # Simulate typing based on response length
+            typing_duration = min(
+                len(response_text) * self._config.typing_speed,
+                10.0,  # Cap at 10 seconds
+            )
 
-                # Check if summarization is needed
-                if should_summarize(
-                    len(formatted_messages), self._config.summary_trigger
-                ):
-                    logger.info("Context size exceeded threshold, would summarize")
-                    # Summarization logic could be added here
+            if typing_duration > 0.5:
+                await channel.typing()
+                await asyncio.sleep(typing_duration)
 
-                logger.info(f"Response sent ({len(response_text)} chars)")
-
+            # Send response - prefer reply if triggered by reply/mention
+            if reason in ("reply_to_bot", "mentioned"):
+                await message.reply(response_text)
             else:
-                # On cooldown - send brief message
-                await channel.send(RATE_LIMIT_RESPONSE)
-                logger.debug(f"User {message.author.id} on cooldown")
+                await channel.send(response_text)
+
+            # Record the response
+            self._decision_maker.record_response(message.author.id)
+            self._decision_maker.record_bot_response_in_channel(channel.id)
+
+            # Extract and save memories periodically
+            if len(formatted_messages) >= 10:
+                recent_conv = extract_recent_conversation(formatted_messages)
+                memories = await self._ai_client.extract_memories(recent_conv)
+                if memories:
+                    self._memory_manager.add_memories_from_text(
+                        message.author.id,
+                        message.author.display_name,
+                        recent_conv,
+                        memories,
+                    )
+
+            # Check if summarization is needed
+            if should_summarize(
+                len(formatted_messages), self._config.summary_trigger
+            ):
+                logger.info("Context size exceeded threshold, would summarize")
+                # Summarization logic could be added here
+
+            logger.info(f"Response sent ({len(response_text)} chars)")
 
         except discord.Forbidden:
             logger.warning(f"Cannot send messages to channel {channel.id}")

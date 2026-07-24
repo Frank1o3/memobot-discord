@@ -175,6 +175,14 @@ class AIClient:
             logger.error(f"Failed to generate response: {e}")
             yield f"[Error: Unable to process request - {type(e).__name__}]"
 
+        except Exception as e:
+            # Broad fallback: generate_response runs inside a fire-and-forget
+            # asyncio.create_task in AICog; without this, any non-APIError
+            # exception (e.g. network error, unexpected library exception)
+            # would be silently swallowed by the task with no user feedback.
+            logger.error(f"Unexpected error in generate_response: {e}", exc_info=True)
+            yield "[Error: An unexpected error occurred while generating a response.]"
+
     async def summarize_conversation(
         self,
         conversation_text: str,
@@ -237,11 +245,27 @@ class AIClient:
             # Parse the result into individual memories
             if isinstance(result, str):
                 lines = [line.strip() for line in result.split("\n") if line.strip()]
-                # Filter out any meta-text
+                # Filter out preamble/meta-text lines.
+                # The prompt instructs the model to output memories directly with
+                # no preamble (see MEMORY_EXTRACTION_PROMPT in prompts.py), but
+                # we keep a lightweight filter for both English and Spanish
+                # variants as a defensive backstop.
+                _PREAMBLE_PREFIXES = (
+                    # English
+                    "memories:",
+                    "here are",
+                    "i found",
+                    # Spanish (MEMORY_EXTRACTION_PROMPT is in Spanish)
+                    "recuerdos:",
+                    "aquí están",
+                    "aqui estan",
+                    "he encontrado",
+                    "a continuación",
+                )
                 memories = [
                     line
                     for line in lines
-                    if not line.lower().startswith(("memories:", "here are", "i found"))
+                    if not line.lower().startswith(_PREAMBLE_PREFIXES)
                 ]
                 return memories
 
@@ -258,8 +282,10 @@ class AIClient:
         """
         Use AI to help decide whether to reply (optional enhancement).
 
-        For now, this uses the decision module's logic. This method could
-        be expanded to use AI for more nuanced decisions.
+        # TODO: This method has no callers and always returns True.
+        # Intended future use: replace the deterministic ReplyDecisionMaker
+        # logic with an AI-based decision for more nuanced participation.
+        # Requires prompt design and latency budget analysis before enabling.
 
         Args:
             context: The conversation context.
@@ -267,9 +293,8 @@ class AIClient:
         Returns:
             True if should reply.
         """
-        # For now, we rely on the decision module's deterministic logic
-        # This could be enhanced with AI-based decision making
-        return True  # Placeholder - actual decision made by ReplyDecisionMaker
+        # Not yet implemented — actual decision is made by ReplyDecisionMaker.
+        return True
 
     def get_stats(self) -> dict:
         """
