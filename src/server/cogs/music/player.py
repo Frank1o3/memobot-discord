@@ -525,3 +525,83 @@ class GuildPlayer:
         from .ui.embeds import PlayerEmbed
 
         return PlayerEmbed.build_queue_embed(self)
+
+    def build_ai_context(self, requesting_member: discord.Member | None = None) -> str:
+        """
+        Build a short natural-language status block describing current playback
+        for injection into the AI system prompt.
+
+        Args:
+            requesting_member: The Discord member who sent the triggering message,
+                if known. Used to state whether they're currently listening.
+
+        Returns:
+            A plain-text block. Empty string is never returned — if idle/not
+            connected, returns a short "not playing" statement instead, so the
+            AI never has to infer silence as "no info available".
+        """
+        try:
+            # Not connected to voice
+            if self._voice_client is None or not self._voice_client.is_connected():
+                return "Voice: Not currently connected to any voice channel in this server."
+
+            # Connected but no track playing
+            if self._current_track is None:
+                channel_name = getattr(getattr(self._voice_client, "channel", None), "name", "unknown")
+                queue_size = len(self._queue)
+                if queue_size == 0:
+                    return f"Voice: Connected to voice channel '{channel_name}' but nothing is playing. Queue is empty."
+                else:
+                    return f"Voice: Connected to voice channel '{channel_name}' but nothing is playing. Queue has {queue_size} track(s)."
+
+            # Track is playing/paused
+            channel_name = getattr(getattr(self._voice_client, "channel", None), "name", "unknown")
+            track_title = self._current_track.title or "Unknown title"
+            track_artist = self._current_track.artist or "Unknown artist"
+            requester = getattr(self._current_track, "requester", None)
+            requester_name = getattr(requester, "display_name", "Unknown") if requester else "Unknown"
+            state = self._state
+            volume = self._volume
+            repeat_mode = self._repeat_mode.value
+
+            # Build base status
+            parts = [
+                f"Voice: Playing in '{channel_name}'.",
+                f"Track: '{track_title}' by {track_artist} (requested by {requester_name}).",
+                f"State: {state}, Volume: {volume}%, Repeat: {repeat_mode}.",
+            ]
+
+            # Next 3 tracks in queue
+            queue_preview = list(self._queue)[:3]
+            queue_remaining = len(self._queue) - 3
+            if queue_preview:
+                next_tracks = ", ".join(t.title or "Unknown" for t in queue_preview)
+                if queue_remaining > 0:
+                    parts.append(f"Next: {next_tracks} (+{queue_remaining} more).")
+                else:
+                    parts.append(f"Next: {next_tracks}.")
+            else:
+                parts.append("Queue is empty.")
+
+            # Members in voice channel (non-bot)
+            voice_channel = getattr(self._voice_client, "channel", None)
+            if voice_channel:
+                humans = [m.display_name for m in voice_channel.members if not m.bot]
+                if humans:
+                    parts.append(f"Currently listening: {', '.join(humans)}.")
+                else:
+                    parts.append("Nobody is currently in the voice channel.")
+
+            # Requesting member status
+            if requesting_member is not None:
+                req_name = requesting_member.display_name
+                if voice_channel and requesting_member in voice_channel.members:
+                    parts.append(f"{req_name} (who just sent a message) is currently in this voice channel listening.")
+                else:
+                    parts.append(f"{req_name} (who just sent a message) is NOT currently in this voice channel.")
+
+            return " ".join(parts)
+
+        except Exception:
+            # Guard against any unexpected errors — return a safe default
+            return "Voice: Unable to determine current playback state."

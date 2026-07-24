@@ -17,6 +17,7 @@ src/server.egg-info/requires.txt
 src/server.egg-info/top_level.txt
 src/server/cogs/ai/__init__.py
 src/server/cogs/ai/ai.py
+src/server/cogs/ai/parser.py
 src/server/cogs/basic/__init__.py
 src/server/cogs/basic/basic.py
 src/server/cogs/music/__init__.py
