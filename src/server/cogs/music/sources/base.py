@@ -124,7 +124,15 @@ class Track:
         )
 
     def to_dict(self) -> dict:
-        """Convert track to dictionary for serialization."""
+        """
+        Convert track to a JSON-serializable dictionary.
+
+        ``requested_by`` is a ``discord.Member`` and is not JSON-safe, so only
+        the member's integer ID is stored under the key ``requested_by_id``.
+        To reconstruct the full ``Member`` object from ``from_dict()``, resolve
+        the ID lazily at the call site using ``guild.get_member(requested_by_id)``
+        or ``await guild.fetch_member(requested_by_id)``.
+        """
         return {
             "title": self.title,
             "stream_url": self.stream_url,
@@ -133,15 +141,27 @@ class Track:
             "duration": self.duration,
             "thumbnail": self.thumbnail,
             "webpage_url": self.webpage_url,
-            "requested_by": self.requested_by,
+            # Store int ID only — discord.Member is not JSON-serializable.
+            "requested_by_id": self.requested_by.id if self.requested_by else None,
             "album": self.album,
             "is_playlist": self.is_playlist,
             "playlist_title": self.playlist_title,
         }
 
     @classmethod
-    def from_dict(cls, data: dict) -> Track:
-        """Create a Track from a dictionary."""
+    def from_dict(cls, data: dict) -> "Track":
+        """
+        Create a Track from a dictionary produced by ``to_dict()``.
+
+        ``requested_by`` is set to ``None`` here because resolving a
+        ``discord.Member`` from an integer ID requires a ``guild`` reference
+        that is not available in this class-method context.
+
+        Callers that need the full ``Member`` object should resolve it lazily::
+
+            track = Track.from_dict(data)
+            member = guild.get_member(data.get("requested_by_id"))
+        """
         return cls(
             title=data.get("title", "Unknown"),
             stream_url=data.get("stream_url", ""),
@@ -150,7 +170,9 @@ class Track:
             duration=data.get("duration"),
             thumbnail=data.get("thumbnail"),
             webpage_url=data.get("webpage_url"),
-            requested_by=data.get("requested_by"),
+            # requested_by cannot be reconstructed without a guild reference;
+            # callers must resolve requested_by_id themselves.
+            requested_by=None,
             album=data.get("album"),
             is_playlist=data.get("is_playlist", False),
             playlist_title=data.get("playlist_title"),

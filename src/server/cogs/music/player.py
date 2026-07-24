@@ -41,19 +41,34 @@ class RepeatMode(Enum):
 class GuildPlayer:
     """
     Manages music playback for a single guild.
-    
+
     Each guild has its own player instance with independent:
     - Voice connection
     - Queue
     - Playback history
     - Volume
     - Repeat mode
+
+    Locking notes
+    -------------
+    ``self._lock`` is a plain (non-reentrant) asyncio.Lock used only for
+    queue mutations.  Callers that need to mutate the queue and then call
+    ``play()`` must release the lock first; ``play()`` does NOT acquire the
+    lock itself so it can be called from both locked and unlocked contexts.
+
+    ``self._playback_generation`` is a monotonically increasing counter
+    incremented at the start of every ``play()`` call.  The ``after_playing``
+    FFmpeg callback captures the generation at the time of the call; when the
+    resulting ``_on_track_finished`` coroutine runs it bails out immediately if
+    the generation no longer matches — preventing a stale callback from
+    advancing the queue after a manual skip/previous/play call has already
+    moved on.
     """
 
     def __init__(self, bot: commands.Bot, cog: "MusicCog"):
         """
         Initialize the guild player.
-        
+
         Args:
             bot: The Discord bot instance.
             cog: The music cog instance.
@@ -61,22 +76,27 @@ class GuildPlayer:
         self._bot = bot
         self._cog = cog
         self._voice_client: Optional[discord.VoiceClient] = None
-        
+
         # Track management
         self._queue: deque[Track] = deque()
         self._history: Deque[Track] = deque(maxlen=50)  # Keep last 50 tracks
         self._current_track: Optional[Track] = None
-        
+
         # Playback state
         self._state = "stopped"  # stopped, playing, paused
         self._volume = 50  # 0-100
         self._repeat_mode = RepeatMode.OFF
-        
+
         # Player message tracking
         self._player_message: Optional[discord.Message] = None
-        
-        # Lock for thread-safe operations
+
+        # Lock for queue-mutation critical sections only.
+        # play() must NOT be called while holding this lock.
         self._lock = asyncio.Lock()
+
+        # Playback generation counter — incremented on every play() call.
+        # Captured by after_playing closure; _on_track_finished bails if stale.
+        self._playback_generation: int = 0
 
     @property
     def voice_client(self) -> Optional[discord.VoiceClient]:
@@ -116,10 +136,10 @@ class GuildPlayer:
     async def connect(self, channel: discord.VoiceChannel) -> bool:
         """
         Connect to a voice channel.
-        
+
         Args:
             channel: The voice channel to connect to.
-            
+
         Returns:
             True if successful, False otherwise.
         """
@@ -152,11 +172,15 @@ class GuildPlayer:
 
     async def play(self, track: Track) -> bool:
         """
-        Play a track.
-        
+        Play a track immediately, replacing any currently playing audio.
+
+        Increments ``_playback_generation`` so that any in-flight
+        ``after_playing`` callback from the previous track is invalidated and
+        will not advance the queue when it eventually fires.
+
         Args:
             track: The track to play.
-            
+
         Returns:
             True if playback started successfully.
         """
@@ -164,137 +188,183 @@ class GuildPlayer:
             logger.warning("Cannot play: not connected to voice channel")
             return False
 
-        async with self._lock:
-            try:
-                # Stop current playback if any
-                if self._voice_client.is_playing():
-                    self._voice_client.stop()
+        try:
+            # Increment generation BEFORE stopping the old source so that
+            # the old after_playing callback captures the stale value.
+            self._playback_generation += 1
+            captured_generation = self._playback_generation
 
-                # Create audio source
-                ffmpeg_options = {
-                    "before_options": (
-                        "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
-                    ),
-                    "options": "-vn",
-                }
+            # Stop current playback if any (fires after_playing with stale gen)
+            if self._voice_client.is_playing() or self._voice_client.is_paused():
+                self._voice_client.stop()
 
-                source = discord.FFmpegPCMAudio(
-                    track.stream_url,
-                    **ffmpeg_options,
-                )
+            # Create audio source
+            ffmpeg_options = {
+                "before_options": (
+                    "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+                ),
+                "options": "-vn",
+            }
 
-                # Apply volume
-                source = discord.PCMVolumeTransformer(source, volume=self._volume / 100)
+            source = discord.FFmpegPCMAudio(
+                track.stream_url,
+                **ffmpeg_options,
+            )
 
-                def after_playing(error: Optional[Exception]) -> None:
-                    """Callback when track finishes."""
-                    if error:
-                        logger.error("Error playing track: %s", error)
+            # Apply volume
+            source = discord.PCMVolumeTransformer(source, volume=self._volume / 100)
 
-                    # Schedule next track in event loop
-                    if not self._state == "paused":
-                        asyncio.run_coroutine_threadsafe(
-                            self._on_track_finished(),
-                            self._bot.loop,
-                        )
+            def after_playing(error: Optional[Exception]) -> None:
+                """
+                Callback invoked by discord.py's voice thread when a track ends.
 
-                self._voice_client.play(source, after=after_playing)
-                
-                # Update state
-                self._current_track = track
-                self._state = "playing"
+                Runs in discord.py's audio thread — NOT the asyncio event loop.
+                Uses run_coroutine_threadsafe to schedule work back on the loop.
+                The captured_generation check prevents a stale callback (from a
+                track that was stopped by skip/previous/play) from advancing the
+                queue.
+                """
+                if error:
+                    logger.error("Error playing track: %s", error)
 
-                logger.info("Now playing: %s by %s", track.title, track.artist or "Unknown")
+                # Bail if this callback is stale (play() was called again since)
+                if captured_generation != self._playback_generation:
+                    logger.debug(
+                        "after_playing: stale generation %d (current %d), ignoring",
+                        captured_generation,
+                        self._playback_generation,
+                    )
+                    return
 
-                # Update player message
-                asyncio.create_task(self.update_player_message())
+                # Schedule next track on the event loop
+                if self._state != "paused":
+                    asyncio.run_coroutine_threadsafe(
+                        self._on_track_finished(captured_generation),
+                        self._bot.loop,
+                    )
 
-                return True
+            self._voice_client.play(source, after=after_playing)
 
-            except Exception as e:
-                logger.error("Failed to play track: %s", e, exc_info=True)
-                return False
+            # Update state
+            self._current_track = track
+            self._state = "playing"
 
-    async def _on_track_finished(self) -> None:
-        """Handle track completion."""
+            logger.info("Now playing: %s by %s", track.title, track.artist or "Unknown")
+
+            # Update player message (fire-and-forget)
+            asyncio.create_task(self.update_player_message())
+
+            return True
+
+        except Exception as e:
+            logger.error("Failed to play track: %s", e, exc_info=True)
+            return False
+
+    async def _on_track_finished(self, generation: int) -> None:
+        """
+        Handle track completion — advance to the next track.
+
+        Guards against the stale-callback race by comparing ``generation``
+        with the current ``_playback_generation``.
+
+        Queue mutations are performed inside ``self._lock``; ``play()`` is
+        called *outside* the lock to avoid a deadlock (asyncio.Lock is not
+        reentrant).
+        """
+        # Guard: bail if a newer play() call has already taken over
+        if generation != self._playback_generation:
+            logger.debug(
+                "_on_track_finished: stale generation %d (current %d), bailing",
+                generation,
+                self._playback_generation,
+            )
+            return
+
+        next_track: Optional[Track] = None
+
         async with self._lock:
             if self._state == "paused":
                 return
 
             # Handle repeat modes
-            if self._repeat_mode == RepeatMode.TRACK:
-                # Replay current track
-                if self._current_track:
-                    await self.play(self._current_track)
-                    return
-
-            if self._repeat_mode == RepeatMode.QUEUE:
-                # Move current to end of queue
-                if self._current_track:
+            if self._repeat_mode == RepeatMode.TRACK and self._current_track:
+                next_track = self._current_track
+            else:
+                if self._repeat_mode == RepeatMode.QUEUE and self._current_track:
+                    # Move current track to the back of the queue
                     self._queue.append(self._current_track)
 
-            # Add current to history before getting next
-            if self._current_track:
-                self._history.append(self._current_track)
+                # Archive current to history
+                if self._current_track:
+                    self._history.append(self._current_track)
 
-            # Get next track
-            if self._queue:
-                next_track = self._queue.popleft()
-                await self.play(next_track)
-            else:
-                # Queue empty
-                self._state = "stopped"
-                self._current_track = None
-                logger.info("Queue empty, stopping playback")
-                await self.update_player_message()
+                # Pop the next track
+                if self._queue:
+                    next_track = self._queue.popleft()
+
+        # Play outside the lock — play() is not reentrant-safe with the lock
+        if next_track is not None:
+            await self.play(next_track)
+        else:
+            self._state = "stopped"
+            self._current_track = None
+            logger.info("Queue empty, stopping playback")
+            await self.update_player_message()
 
     async def play_next(self) -> bool:
         """
         Skip to the next track.
-        
+
         Returns:
-            True if there was a next track.
+            True if there was a next track to play.
         """
+        next_track: Optional[Track] = None
+
         async with self._lock:
-            # Add current to history
+            # Archive current to history
             if self._current_track:
                 self._history.append(self._current_track)
 
             if self._queue:
                 next_track = self._queue.popleft()
-                await self.play(next_track)
-                return True
 
-            # No more tracks
-            self._state = "stopped"
-            self._current_track = None
-            await self.update_player_message()
-            return False
+        # Call play() outside the lock
+        if next_track is not None:
+            await self.play(next_track)
+            return True
+
+        self._state = "stopped"
+        self._current_track = None
+        await self.update_player_message()
+        return False
 
     async def play_previous(self) -> bool:
         """
         Play the previous track from history.
-        
+
         Returns:
             True if there was a previous track.
         """
+        previous_track: Optional[Track] = None
+
         async with self._lock:
             if not self._history:
                 return False
 
-            # Add current back to queue front
+            # Return current track to the front of the queue
             if self._current_track:
                 self._queue.appendleft(self._current_track)
 
-            # Get previous from history
             previous_track = self._history.pop()
-            await self.play(previous_track)
-            return True
+
+        # Call play() outside the lock
+        await self.play(previous_track)
+        return True
 
     def pause(self) -> bool:
         """
         Pause playback.
-        
+
         Returns:
             True if paused successfully.
         """
@@ -308,7 +378,7 @@ class GuildPlayer:
     def resume(self) -> bool:
         """
         Resume paused playback.
-        
+
         Returns:
             True if resumed successfully.
         """
@@ -321,6 +391,9 @@ class GuildPlayer:
 
     def stop(self) -> None:
         """Stop playback and clear queue."""
+        # Increment generation so any pending after_playing callback is invalidated
+        self._playback_generation += 1
+
         if self._voice_client:
             self._voice_client.stop()
 
@@ -334,7 +407,7 @@ class GuildPlayer:
     def set_volume(self, level: int) -> None:
         """
         Set playback volume.
-        
+
         Args:
             level: Volume level 0-100.
         """
@@ -357,10 +430,10 @@ class GuildPlayer:
 
     def toggle_repeat(self) -> str:
         """
-        Cycle through repeat modes.
-        
+        Cycle through repeat modes: OFF → TRACK → QUEUE → OFF.
+
         Returns:
-            The new repeat mode.
+            The new repeat mode value string.
         """
         modes = [RepeatMode.OFF, RepeatMode.TRACK, RepeatMode.QUEUE]
         current_index = modes.index(self._repeat_mode)
@@ -373,7 +446,7 @@ class GuildPlayer:
     def add_to_queue(self, track: Track) -> None:
         """
         Add a track to the queue.
-        
+
         Args:
             track: The track to add.
         """
@@ -383,7 +456,7 @@ class GuildPlayer:
     def add_tracks_to_queue(self, tracks: list[Track]) -> None:
         """
         Add multiple tracks to the queue.
-        
+
         Args:
             tracks: List of tracks to add.
         """
@@ -393,16 +466,20 @@ class GuildPlayer:
 
     def remove_from_queue(self, index: int) -> Optional[Track]:
         """
-        Remove a track from the queue by index.
-        
+        Remove a track from the queue by index and return it.
+
         Args:
-            index: Zero-based index in the queue.
-            
+            index: Zero-based index in the upcoming queue.
+
         Returns:
-            The removed track, or None if index invalid.
+            The removed track, or None if the index is out of range.
         """
         if 0 <= index < len(self._queue):
-            return self._queue[index]
+            # Convert to list, remove, rebuild deque
+            queue_list = list(self._queue)
+            removed = queue_list.pop(index)
+            self._queue = deque(queue_list)
+            return removed
         return None
 
     def clear_queue(self) -> None:
@@ -422,7 +499,7 @@ class GuildPlayer:
         try:
             embed = self.build_embed()
             view = self._cog.get_player_view(self._player_message.guild.id)
-            
+
             await self._player_message.edit(embed=embed, view=view)
         except discord.NotFound:
             # Message was deleted
