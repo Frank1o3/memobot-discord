@@ -88,6 +88,12 @@ Para saltar la canción que se está reproduciendo:
 
 <tool:skip>
 
+### Ajustar el volumen de la canción actual
+
+Para Ajustar el volumen de la canción actual:
+
+<tool:volume, level:50>
+
 ### Reglas de las herramientas
 
 * Utiliza herramientas únicamente cuando sea necesario ejecutar una acción.
