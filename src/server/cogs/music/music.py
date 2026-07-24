@@ -7,18 +7,15 @@ Uses GuildPlayer for per-guild playback state management.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from typing import Optional
 
 import discord
 from discord import app_commands
 from discord.ext import commands
 
 from .player import GuildPlayer
-from .sources.resolver import SourceResolver, SourceType, ExtractionResult
+from .sources.resolver import ExtractionResult, SourceResolver
 from .ui.player_view import PlayerView
-from .ui.embeds import PlayerEmbed
 
 logger = logging.getLogger(__name__)
 
@@ -297,8 +294,7 @@ class MusicCog(commands.Cog):
                 )
         else:
             await interaction.followup.send(
-                f"📋 Added **{track.title}** to queue "
-                f"(position {len(player.queue)}).",
+                f"📋 Added **{track.title}** to queue (position {len(player.queue)}).",
             )
 
     # ------------------------------------------------------------------
@@ -344,7 +340,7 @@ class MusicCog(commands.Cog):
                 await interaction.edit_original_response(
                     content=f"⏳ Loading playlist... Added **{added}/{total}** tracks.",
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001
                 pass  # Ignore transient edit failures
 
         result: ExtractionResult = await self._resolver.extract_playlist_concurrent(

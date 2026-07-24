@@ -6,7 +6,7 @@ Creates rich embeds displaying current track information and player state.
 
 from __future__ import annotations
 
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import discord
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class PlayerEmbed:
     """
     Builder class for creating player embeds.
-    
+
     Creates consistent embeds for the music player showing:
     - Current track info
     - Player state (playing, paused, stopped)
@@ -28,20 +28,20 @@ class PlayerEmbed:
 
     def __init__(self):
         """Initialize the embed builder."""
-        self._embed: Optional[discord.Embed] = None
+        self._embed: discord.Embed | None = None
 
     def build(
         self,
-        player: "GuildPlayer",
+        player: GuildPlayer,
         show_thumbnail: bool = True,
     ) -> discord.Embed:
         """
         Build a player embed from guild player state.
-        
+
         Args:
             player: The guild player instance.
             show_thumbnail: Whether to include track thumbnail.
-            
+
         Returns:
             A configured discord.Embed.
         """
@@ -56,7 +56,7 @@ class PlayerEmbed:
 
     def _build_now_playing_embed(
         self,
-        player: "GuildPlayer",
+        player: GuildPlayer,
         track,
         show_thumbnail: bool,
     ) -> None:
@@ -148,9 +148,12 @@ class PlayerEmbed:
 
         # Add footer with webpage URL if available
         if track.webpage_url:
-            self._embed.set_footer(text=track.webpage_url[:50] + ("..." if len(track.webpage_url) > 50 else ""))
+            self._embed.set_footer(
+                text=track.webpage_url[:50]
+                + ("..." if len(track.webpage_url) > 50 else "")
+            )
 
-    def _build_idle_embed(self, player: "GuildPlayer") -> None:
+    def _build_idle_embed(self, player: GuildPlayer) -> None:
         """Build embed for when nothing is playing."""
         self._embed = discord.Embed(
             title="🎵 Music Player",
@@ -185,27 +188,27 @@ class PlayerEmbed:
             inline=True,
         )
 
-    def _get_state_color(self, player: "GuildPlayer") -> discord.Color:
+    def _get_state_color(self, player: GuildPlayer) -> discord.Color:
         """Get embed color based on player state."""
         colors = {
             "playing": discord.Color.green(),
             "paused": discord.Color.orange(),
-            "stopped": discord.Color.gray(),
+            "stopped": discord.Color.light_gray(),
         }
         return colors.get(player.state, discord.Color.blue())
 
     @staticmethod
     def build_queue_embed(
-        player: "GuildPlayer",
+        player: GuildPlayer,
         max_tracks: int = 10,
     ) -> discord.Embed:
         """
         Build an embed showing the current queue.
-        
+
         Args:
             player: The guild player instance.
             max_tracks: Maximum number of tracks to display.
-            
+
         Returns:
             A configured discord.Embed.
         """

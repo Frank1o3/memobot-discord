@@ -17,7 +17,7 @@ import logging
 import random
 from collections import deque
 from enum import Enum
-from typing import Optional, TYPE_CHECKING, Deque
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -65,7 +65,7 @@ class GuildPlayer:
     moved on.
     """
 
-    def __init__(self, bot: commands.Bot, cog: "MusicCog"):
+    def __init__(self, bot: commands.Bot, cog: MusicCog):
         """
         Initialize the guild player.
 
@@ -75,20 +75,20 @@ class GuildPlayer:
         """
         self._bot = bot
         self._cog = cog
-        self._voice_client: Optional[discord.VoiceClient] = None
+        self._voice_client: discord.VoiceClient | None = None
 
         # Track management
         self._queue: deque[Track] = deque()
-        self._history: Deque[Track] = deque(maxlen=50)  # Keep last 50 tracks
-        self._current_track: Optional[Track] = None
+        self._history: deque[Track] = deque(maxlen=50)  # Keep last 50 tracks
+        self._current_track: Track | None = None
 
         # Playback state
         self._state = "stopped"  # stopped, playing, paused
-        self._volume = 50  # 0-100
+        self._volume = 100  # 0-100
         self._repeat_mode = RepeatMode.OFF
 
         # Player message tracking
-        self._player_message: Optional[discord.Message] = None
+        self._player_message: discord.Message | None = None
 
         # Lock for queue-mutation critical sections only.
         # play() must NOT be called while holding this lock.
@@ -99,12 +99,12 @@ class GuildPlayer:
         self._playback_generation: int = 0
 
     @property
-    def voice_client(self) -> Optional[discord.VoiceClient]:
+    def voice_client(self) -> discord.VoiceClient | None:
         """Get the voice client."""
         return self._voice_client
 
     @property
-    def current_track(self) -> Optional[Track]:
+    def current_track(self) -> Track | None:
         """Get the currently playing track."""
         return self._current_track
 
@@ -114,7 +114,7 @@ class GuildPlayer:
         return self._queue
 
     @property
-    def history(self) -> Deque[Track]:
+    def history(self) -> deque[Track]:
         """Get the playback history."""
         return self._history
 
@@ -201,7 +201,13 @@ class GuildPlayer:
             # Create audio source
             ffmpeg_options = {
                 "before_options": (
-                    "-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+                    "-reconnect 1 "
+                    "-reconnect_streamed 1 "
+                    "-reconnect_on_network_error 1 "
+                    "-reconnect_on_http_error 4xx,5xx "
+                    "-reconnect_at_eof 1 "
+                    "-reconnect_delay_max 5 "
+                    "-rw_timeout 15000000"
                 ),
                 "options": "-vn",
             }
@@ -214,7 +220,7 @@ class GuildPlayer:
             # Apply volume
             source = discord.PCMVolumeTransformer(source, volume=self._volume / 100)
 
-            def after_playing(error: Optional[Exception]) -> None:
+            def after_playing(error: Exception | None) -> None:
                 """
                 Callback invoked by discord.py's voice thread when a track ends.
 
@@ -280,7 +286,7 @@ class GuildPlayer:
             )
             return
 
-        next_track: Optional[Track] = None
+        next_track: Track | None = None
 
         async with self._lock:
             if self._state == "paused":
@@ -318,7 +324,7 @@ class GuildPlayer:
         Returns:
             True if there was a next track to play.
         """
-        next_track: Optional[Track] = None
+        next_track: Track | None = None
 
         async with self._lock:
             # Archive current to history
@@ -345,7 +351,7 @@ class GuildPlayer:
         Returns:
             True if there was a previous track.
         """
-        previous_track: Optional[Track] = None
+        previous_track: Track | None = None
 
         async with self._lock:
             if not self._history:
@@ -464,7 +470,7 @@ class GuildPlayer:
             self._queue.append(track)
         logger.info("Added %d tracks to queue", len(tracks))
 
-    def remove_from_queue(self, index: int) -> Optional[Track]:
+    def remove_from_queue(self, index: int) -> Track | None:
         """
         Remove a track from the queue by index and return it.
 
@@ -510,10 +516,12 @@ class GuildPlayer:
     def build_embed(self) -> discord.Embed:
         """Build the player embed."""
         from .ui.embeds import PlayerEmbed
+
         builder = PlayerEmbed()
         return builder.build(self)
 
     def build_queue_embed(self) -> discord.Embed:
         """Build the queue embed."""
         from .ui.embeds import PlayerEmbed
+
         return PlayerEmbed.build_queue_embed(self)

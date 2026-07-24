@@ -10,13 +10,14 @@ This module handles all interactions with the Groq API, including:
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, AsyncGenerator
+from collections.abc import AsyncGenerator
+from typing import TYPE_CHECKING
 
-from groq import Groq, APIError, RateLimitError, APITimeoutError
+from groq import APIError, APITimeoutError, Groq, RateLimitError
 
 from server.prompts import (
-    build_summary_prompt,
     build_memory_extraction_prompt,
+    build_summary_prompt,
 )
 from server.rate_limit import APIRateLimitHandler
 
@@ -33,7 +34,7 @@ class AIClient:
     Handles streaming responses, retries, and rate limiting for all AI operations.
     """
 
-    def __init__(self, config: "Config") -> None:
+    def __init__(self, config: Config) -> None:
         """
         Initialize the AI client.
 
@@ -52,7 +53,7 @@ class AIClient:
         stream: bool = True,
         max_tokens: int | None = None,
         temperature: float | None = None,
-    ) -> AsyncGenerator[str, None] | str:
+    ) -> AsyncGenerator[str] | str:
         """
         Make an API call to Groq with retry logic.
 
@@ -148,7 +149,7 @@ class AIClient:
         self,
         system_prompt: str,
         user_messages: list[dict[str, str]],
-    ) -> AsyncGenerator[str, None]:
+    ) -> AsyncGenerator[str]:
         """
         Generate a streaming response from the AI.
 

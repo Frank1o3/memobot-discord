@@ -7,15 +7,15 @@ Provides button controls for the music player.
 from __future__ import annotations
 
 import logging
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import discord
-from discord.ui import View, Button
 from discord.enums import ButtonStyle
+from discord.ui import Button, View
 
 if TYPE_CHECKING:
-    from ..player import GuildPlayer
     from ..music import MusicCog
+    from ..player import GuildPlayer
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class PlayerView(View):
     """
     Interactive view with music player control buttons.
-    
+
     Buttons:
     - Previous track
     - Pause/Resume playback
@@ -38,13 +38,13 @@ class PlayerView(View):
 
     def __init__(
         self,
-        cog: "MusicCog",
+        cog: MusicCog,
         guild_id: int,
         timeout: float = 300,
     ):
         """
         Initialize the player view.
-        
+
         Args:
             cog: The music cog instance.
             guild_id: The guild this view controls.
@@ -53,9 +53,6 @@ class PlayerView(View):
         super().__init__(timeout=timeout)
         self._cog = cog
         self._guild_id = guild_id
-
-        # Add buttons
-        self._add_buttons()
 
     def _add_buttons(self) -> None:
         """Add all control buttons to the view."""
@@ -137,19 +134,19 @@ class PlayerView(View):
             )
         )
 
-    def get_player(self) -> Optional["GuildPlayer"]:
+    def get_player(self) -> GuildPlayer | None:
         """Get the guild player instance."""
         return self._cog.get_player(self._guild_id)
 
     async def check_permissions(self, interaction: discord.Interaction) -> bool:
         """
         Check if the user has permission to use player controls.
-        
+
         Users must be in the same voice channel as the bot.
-        
+
         Args:
             interaction: The button interaction.
-            
+
         Returns:
             True if user has permission, False otherwise.
         """
@@ -181,7 +178,9 @@ class PlayerView(View):
 
         return True
 
-    @discord.ui.button(style=ButtonStyle.secondary, emoji="⏮️", custom_id="music_previous", row=0)
+    @discord.ui.button(
+        style=ButtonStyle.secondary, emoji="⏮️", custom_id="music_previous", row=0
+    )
     async def previous_button(
         self,
         interaction: discord.Interaction,
@@ -210,7 +209,9 @@ class PlayerView(View):
                 ephemeral=True,
             )
 
-    @discord.ui.button(style=ButtonStyle.primary, emoji="⏯️", custom_id="music_pause_resume", row=0)
+    @discord.ui.button(
+        style=ButtonStyle.primary, emoji="⏯️", custom_id="music_pause_resume", row=0
+    )
     async def pause_resume_button(
         self,
         interaction: discord.Interaction,
@@ -238,7 +239,9 @@ class PlayerView(View):
             view=self,
         )
 
-    @discord.ui.button(style=ButtonStyle.secondary, emoji="⏭️", custom_id="music_next", row=0)
+    @discord.ui.button(
+        style=ButtonStyle.secondary, emoji="⏭️", custom_id="music_next", row=0
+    )
     async def next_button(
         self,
         interaction: discord.Interaction,
@@ -267,7 +270,9 @@ class PlayerView(View):
                 ephemeral=True,
             )
 
-    @discord.ui.button(style=ButtonStyle.secondary, emoji="🔉", custom_id="music_volume_down", row=1)
+    @discord.ui.button(
+        style=ButtonStyle.secondary, emoji="🔉", custom_id="music_volume_down", row=1
+    )
     async def volume_down_button(
         self,
         interaction: discord.Interaction,
@@ -291,7 +296,9 @@ class PlayerView(View):
             view=self,
         )
 
-    @discord.ui.button(style=ButtonStyle.secondary, emoji="🔊", custom_id="music_volume_up", row=1)
+    @discord.ui.button(
+        style=ButtonStyle.secondary, emoji="🔊", custom_id="music_volume_up", row=1
+    )
     async def volume_up_button(
         self,
         interaction: discord.Interaction,
@@ -315,7 +322,9 @@ class PlayerView(View):
             view=self,
         )
 
-    @discord.ui.button(style=ButtonStyle.danger, emoji="⏹️", custom_id="music_stop", row=1)
+    @discord.ui.button(
+        style=ButtonStyle.danger, emoji="⏹️", custom_id="music_stop", row=1
+    )
     async def stop_button(
         self,
         interaction: discord.Interaction,
@@ -339,7 +348,9 @@ class PlayerView(View):
             view=self,
         )
 
-    @discord.ui.button(style=ButtonStyle.secondary, emoji="📋", custom_id="music_queue", row=2)
+    @discord.ui.button(
+        style=ButtonStyle.secondary, emoji="📋", custom_id="music_queue", row=2
+    )
     async def queue_button(
         self,
         interaction: discord.Interaction,
@@ -363,7 +374,9 @@ class PlayerView(View):
             ephemeral=True,
         )
 
-    @discord.ui.button(style=ButtonStyle.secondary, emoji="🔀", custom_id="music_shuffle", row=2)
+    @discord.ui.button(
+        style=ButtonStyle.secondary, emoji="🔀", custom_id="music_shuffle", row=2
+    )
     async def shuffle_button(
         self,
         interaction: discord.Interaction,
@@ -387,7 +400,9 @@ class PlayerView(View):
             ephemeral=True,
         )
 
-    @discord.ui.button(style=ButtonStyle.secondary, emoji="🔁", custom_id="music_repeat", row=2)
+    @discord.ui.button(
+        style=ButtonStyle.secondary, emoji="🔁", custom_id="music_repeat", row=2
+    )
     async def repeat_button(
         self,
         interaction: discord.Interaction,

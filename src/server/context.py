@@ -7,9 +7,9 @@ including fetching channel history, formatting messages, and managing context li
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
-import discord
+from datetime import datetime, timezone, UTC
 
+import discord
 
 logger = logging.getLogger(__name__)
 
@@ -166,7 +166,7 @@ def format_message_for_context(
     return FormattedMessage(
         author_name=message.author.display_name,
         content=content.strip() or "[Empty message]",
-        timestamp=message.created_at.replace(tzinfo=timezone.utc),
+        timestamp=message.created_at.replace(tzinfo=UTC),
         is_bot=message.author.bot,
         attachments=attachments,
         reference=reference,
@@ -211,7 +211,7 @@ def build_context(
         formatted_messages = formatted_messages[-max_messages:]
 
     # Build context string
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     context_lines = [msg.format(relative_to=now) for msg in formatted_messages]
 
     context_string = "\n\n".join(context_lines)
@@ -257,5 +257,5 @@ def extract_recent_conversation(
     if not recent:
         return ""
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     return "\n\n".join(msg.format(relative_to=now) for msg in recent)

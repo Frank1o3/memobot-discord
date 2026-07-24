@@ -8,7 +8,7 @@ when the bot should respond to messages based on various triggers.
 import logging
 import random
 from dataclasses import dataclass, field
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone, UTC
 from typing import TYPE_CHECKING
 
 import discord
@@ -75,7 +75,7 @@ class ChannelConversationState:
             self.active_participants.add(entry.author_id)
 
         # Clean old participants (older than 10 minutes)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - timedelta(minutes=10)
         self.active_participants = {
             uid
@@ -93,7 +93,7 @@ class ChannelConversationState:
         Returns:
             True if bot was recently involved.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - timedelta(minutes=window_minutes)
 
         return any(
@@ -109,7 +109,7 @@ class ChannelConversationState:
         Args:
             max_age_minutes: Maximum age of entries to keep.
         """
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - timedelta(minutes=max_age_minutes)
         self.entries = [e for e in self.entries if e.timestamp > cutoff]
 
@@ -126,7 +126,7 @@ class ReplyDecisionMaker:
     - Random probability for occasional engagement
     """
 
-    def __init__(self, config: "Config", bot_user: discord.ClientUser) -> None:
+    def __init__(self, config: Config, bot_user: discord.ClientUser) -> None:
         """
         Initialize the reply decision maker.
 
@@ -194,7 +194,7 @@ class ReplyDecisionMaker:
         entry = ConversationEntry(
             message_id=message.id,
             author_id=message.author.id,
-            timestamp=message.created_at.replace(tzinfo=timezone.utc),
+            timestamp=message.created_at.replace(tzinfo=UTC),
             mentions_bot=mentions_bot,
             replies_to_bot=replies_to_bot,
             contains_bot_name=contains_bot_name,
@@ -272,7 +272,7 @@ class ReplyDecisionMaker:
             return False
 
         last_response = self._cooldowns[user_id]
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         elapsed = (now - last_response).total_seconds()
 
         return elapsed < self._config.cooldown_seconds
@@ -284,7 +284,7 @@ class ReplyDecisionMaker:
         Args:
             user_id: The user's Discord ID.
         """
-        self._cooldowns[user_id] = datetime.now(timezone.utc)
+        self._cooldowns[user_id] = datetime.now(UTC)
         logger.debug(f"Recorded response cooldown for user {user_id}")
 
     def record_bot_response_in_channel(self, channel_id: int) -> None:
@@ -295,7 +295,7 @@ class ReplyDecisionMaker:
             channel_id: The channel ID where the bot responded.
         """
         state = self._get_channel_state(channel_id)
-        state.last_bot_response = datetime.now(timezone.utc)
+        state.last_bot_response = datetime.now(UTC)
 
     def cleanup(self) -> None:
         """Clean up old conversation entries across all channels."""
@@ -303,7 +303,7 @@ class ReplyDecisionMaker:
             state.clear_old_entries(max_age_minutes=30)
 
         # Clean old cooldowns (older than 1 minute)
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         cutoff = now - timedelta(seconds=60)
         self._cooldowns = {
             uid: ts for uid, ts in self._cooldowns.items() if ts > cutoff

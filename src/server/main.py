@@ -17,7 +17,10 @@ import discord
 from discord.ext import commands
 
 from server.ai_client import AIClient
-from server.config import config_manager, Config
+from server.cogs.ai import AICog
+from server.cogs.basic import BasicCog
+from server.cogs.music import MusicCog
+from server.config import Config, config_manager
 from server.decision import ReplyDecisionMaker
 from server.memory import MemoryManager
 
@@ -127,9 +130,6 @@ class DiscordAIChatBot:
             raise RuntimeError("All components must be initialized first")
 
         # Import and load cogs
-        from server.cogs.basic import BasicCog
-        from server.cogs.ai import AICog
-        from server.cogs.music import MusicCog
 
         # Load BasicCog
         await self._bot.add_cog(BasicCog(self._bot), override=True)
@@ -289,7 +289,7 @@ async def run() -> None:
     except KeyboardInterrupt:
         logger.info("Interrupted by user")
     except Exception as e:
-        logger.error(f"Fatal error: {e}", exc_info=True)
+        logger.exception(e)
         raise
     finally:
         bot_instance = None
@@ -298,5 +298,6 @@ async def run() -> None:
 def main() -> None:
     asyncio.run(run())
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     main()

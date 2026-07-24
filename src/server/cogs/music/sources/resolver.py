@@ -12,9 +12,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Callable, Coroutine, Optional, Any
+from typing import Any, Optional
 
 import yt_dlp
 
@@ -45,7 +46,7 @@ class ExtractionResult:
 
     source_type: SourceType
     tracks: list[Track]
-    playlist_title: Optional[str] = None
+    playlist_title: str | None = None
     errors: list[str] = None
 
     def __post_init__(self):
@@ -94,6 +95,7 @@ class SourceResolver:
             "no_warnings": True,
             "extract_flat": False,
             "noplaylist": False,
+            "extractor_args": {"youtube": {"player_client": ["android", "web"]}},
         }
 
     def detect_source(self, query: str) -> SourceType:
@@ -361,10 +363,7 @@ class SourceResolver:
                         if video_info:
                             completed += 1
                             # Fire progress callback every 10 tracks
-                            if (
-                                progress_callback is not None
-                                and completed % 10 == 0
-                            ):
+                            if progress_callback is not None and completed % 10 == 0:
                                 try:
                                     await progress_callback(completed, total)
                                 except Exception:
@@ -702,7 +701,9 @@ class SourceResolver:
                 errors=[f"Search failed: {e}"],
             )
 
-    def _extract_info(self, url: str, opts: dict = None, playlist_extract: bool = False) -> Optional[dict]:
+    def _extract_info(
+        self, url: str, opts: dict = None, playlist_extract: bool = False
+    ) -> Optional[dict]:
         """
         Extract info using yt_dlp synchronously.
 
@@ -780,7 +781,9 @@ class SourceResolver:
                 return []
 
             playlist_id = match.group(1)
-            playlist = await asyncio.to_thread(self._spotify_client.playlist, playlist_id)
+            playlist = await asyncio.to_thread(
+                self._spotify_client.playlist, playlist_id
+            )
 
             if not playlist:
                 return []
@@ -792,13 +795,17 @@ class SourceResolver:
                 track = item.get("track")
                 if track:
                     artists = [a["name"] for a in track.get("artists", [])]
-                    tracks.append({
-                        "name": track.get("name"),
-                        "artist": ", ".join(artists),
-                        "album_name": track.get("album", {}).get("name"),
-                        "spotify_url": track.get("external_urls", {}).get("spotify"),
-                        "playlist_name": playlist_name,
-                    })
+                    tracks.append(
+                        {
+                            "name": track.get("name"),
+                            "artist": ", ".join(artists),
+                            "album_name": track.get("album", {}).get("name"),
+                            "spotify_url": track.get("external_urls", {}).get(
+                                "spotify"
+                            ),
+                            "playlist_name": playlist_name,
+                        }
+                    )
 
             return tracks
         except Exception as e:
@@ -830,12 +837,14 @@ class SourceResolver:
 
             for track in album.get("tracks", {}).get("items", []):
                 artists = [a["name"] for a in track.get("artists", [])]
-                tracks.append({
-                    "name": track.get("name"),
-                    "artist": ", ".join(artists),
-                    "album_name": album_name,
-                    "spotify_url": track.get("external_urls", {}).get("spotify"),
-                })
+                tracks.append(
+                    {
+                        "name": track.get("name"),
+                        "artist": ", ".join(artists),
+                        "album_name": album_name,
+                        "spotify_url": track.get("external_urls", {}).get("spotify"),
+                    }
+                )
 
             return tracks
         except Exception as e:

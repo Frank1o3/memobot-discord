@@ -121,10 +121,10 @@ class ConfigManager:
     throughout the application without global mutable state.
     """
 
-    _instance: "ConfigManager | None" = None
+    _instance: ConfigManager | None = None
     _config: Config | None = None
 
-    def __new__(cls) -> "ConfigManager":
+    def __new__(cls) -> ConfigManager:
         """Create or return existing ConfigManager instance."""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
