@@ -32,9 +32,6 @@ htmlcov/
 # Python cache
 .mypy_cache/
 .pytest_cache/
-
-# Distribution / packaging
-dist/
-build/
-*.egg-info/
 ```
+
+config.json

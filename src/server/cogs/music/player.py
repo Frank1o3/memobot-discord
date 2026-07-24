@@ -84,7 +84,7 @@ class GuildPlayer:
 
         # Playback state
         self._state = "stopped"  # stopped, playing, paused
-        self._volume = 100  # 0-100
+        self._volume = 20  # 0-100
         self._repeat_mode = RepeatMode.OFF
 
         # Player message tracking
