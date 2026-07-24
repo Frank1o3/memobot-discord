@@ -11,6 +11,7 @@ This module handles all interactions with the Groq API, including:
 import asyncio
 import logging
 from collections.abc import AsyncGenerator
+import threading
 from typing import TYPE_CHECKING
 
 from groq import APIError, APITimeoutError, Groq, RateLimitError
@@ -25,6 +26,7 @@ if TYPE_CHECKING:
     from server.config import Config
 
 logger = logging.getLogger(__name__)
+_STREAM_DONE = object()
 
 
 class AIClient:
@@ -86,7 +88,7 @@ class AIClient:
             )
 
             if stream:
-                return self._stream_response(response)  # type: ignore[arg-type]
+                return self._stream_response_async(response)  # type: ignore[arg-type]
             else:
                 return response.choices[0].message.content or ""
 
@@ -124,26 +126,40 @@ class AIClient:
                     pass
         return None
 
-    def _stream_response(
-        self,
-        response,
-    ) -> AsyncGenerator[str, None]:
+    async def _stream_response_async(self, response) -> AsyncGenerator[str, None]:
         """
-        Stream response chunks from the API.
+        Bridge Groq's blocking sync stream into a real async generator.
 
-        Args:
-            response: The API response stream.
-
-        Yields:
-            Response text chunks.
+        The Groq SDK's streaming response performs blocking socket reads per
+        chunk. Iterating it directly inside a coroutine blocks the whole event
+        loop for the entire response duration. We run the iteration in a
+        daemon thread and forward chunks to the loop via an asyncio.Queue.
         """
-        try:
-            for chunk in response:
-                if chunk.choices and chunk.choices[0].delta.content:
-                    yield chunk.choices[0].delta.content
-        except Exception as e:
-            logger.error(f"Error streaming response: {e}")
-            raise
+        loop = asyncio.get_event_loop()
+        queue: asyncio.Queue = asyncio.Queue()
+
+        def _produce() -> None:
+            try:
+                for chunk in response:
+                    if chunk.choices and chunk.choices[0].delta.content:
+                        loop.call_soon_threadsafe(
+                            queue.put_nowait, chunk.choices[0].delta.content
+                        )
+            except Exception as e:  # noqa: BLE001
+                loop.call_soon_threadsafe(queue.put_nowait, e)
+            finally:
+                loop.call_soon_threadsafe(queue.put_nowait, _STREAM_DONE)
+
+        threading.Thread(target=_produce, daemon=True).start()
+
+        while True:
+            item = await queue.get()
+            if item is _STREAM_DONE:
+                return
+            if isinstance(item, Exception):
+                logger.error(f"Error streaming response: {item}")
+                raise item
+            yield item
 
     async def generate_response(
         self,
@@ -165,11 +181,8 @@ class AIClient:
         logger.debug(f"Generating response with {len(user_messages)} messages")
 
         try:
-            stream = self._make_api_call(  # type: ignore[assignment]
-                messages=messages,
-                stream=True,
-            )
-            for chunk in await stream:
+            stream = await self._make_api_call(messages=messages, stream=True)
+            async for chunk in stream:  # was: for chunk in await stream:
                 yield chunk
 
         except APIError as e:

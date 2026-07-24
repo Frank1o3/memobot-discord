@@ -106,6 +106,7 @@ class AICog(commands.Cog):
         Args:
             message: The Discord message to process.
         """
+
         # Ignore our own messages
         if message.author == self.bot.user:
             return
