@@ -176,6 +176,16 @@ class AICog(commands.Cog):
             if memory_context:
                 system_prompt += "\n\n" + memory_context
 
+            # Add voice/player status context
+            voice_context = ""
+            if self._music_cog and message.guild:
+                player = self._music_cog.get_player(message.guild.id)
+                requesting_member = message.author if isinstance(message.author, discord.Member) else None
+                voice_context = player.build_ai_context(requesting_member)
+
+            if voice_context:
+                system_prompt += "\n\n" + voice_context
+
             # Format conversation for AI
             user_messages = []
             if context_str:
